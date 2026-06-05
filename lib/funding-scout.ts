@@ -1,0 +1,1130 @@
+/**
+ * GrantFlow AI — Funding Scout
+ *
+ * Analyzes the organization profile and generates prioritized grant search
+ * strategies. No fabricated grant results — only ranked search strategies,
+ * source pointers, and fit analysis derived from the org's own profile data.
+ */
+
+// ── Org Profile Subset ────────────────────────────────────────────────────────
+// We define our own interface so this module stays client-safe (no prisma runtime import)
+
+export interface OrgProfileSnapshot {
+  name: string;
+  orgType?: string | null; // OrgType enum string value
+  missionStatement?: string | null;
+  programsServices?: string | null;
+  targetPopulation?: string | null;
+  geographicArea?: string | null;
+  city?: string | null;
+  state?: string | null;
+  annualBudget?: number | null;
+  profileCompleteness?: number;
+  pastGrantsNarrative?: string | null;
+}
+
+// ── Output Types ─────────────────────────────────────────────────────────────
+
+export type SourceCategory = "A" | "B" | "C" | "D" | "E" | "F";
+
+export interface SourceBucket {
+  id: string;
+  name: string;
+  category: SourceCategory;
+  categoryLabel: string;
+  url: string;
+  description: string;
+  recommendedSearchTerms: string[];
+  fitReason: string;
+  verificationNeeded: boolean;
+}
+
+export interface SearchStrategy {
+  term: string;
+  priority: "high" | "medium" | "low";
+  categoryLabel: string;
+  suggestedSources: string[];
+}
+
+export interface DisqualifierWarning {
+  type: string;
+  description: string;
+  avoidance: string;
+}
+
+export interface ProjectAngle {
+  title: string;
+  description: string;
+}
+
+export interface FundingScoutReport {
+  orgName: string;
+  generatedAt: Date;
+  profileCompleteness: number;
+  searchStrategies: SearchStrategy[];
+  sourceBuckets: SourceBucket[];
+  projectAngles: ProjectAngle[];
+  doNotChase: string[];
+  disqualifierWarnings: DisqualifierWarning[];
+}
+
+// ── Profile Type Detection ────────────────────────────────────────────────────
+
+function isBusinessProfile(org: OrgProfileSnapshot): boolean {
+  const type = (org.orgType ?? "").toUpperCase();
+  // Explicit business types
+  if (
+    type === "SMALL_BUSINESS" ||
+    type === "INDIVIDUAL" ||
+    type === "OTHER"
+  ) {
+    // "OTHER" alone is ambiguous — also check name/mission for business signals
+    if (type === "SMALL_BUSINESS" || type === "INDIVIDUAL") return true;
+  }
+  // Fallback: check org name for common business suffixes
+  const name = (org.name ?? "").toLowerCase();
+  if (
+    name.includes(" llc") ||
+    name.includes(" inc.") ||
+    name.endsWith(" inc") ||
+    name.includes(" corp") ||
+    name.includes(" co.") ||
+    name.includes(" ltd")
+  ) {
+    // Only treat as business if not a nonprofit type
+    const isNonprofitType =
+      type.includes("NONPROFIT") ||
+      type.includes("COMMUNITY_GROUP") ||
+      type.includes("TRIBAL") ||
+      type.includes("SCHOOL") ||
+      type.includes("EDUCATION") ||
+      type.includes("GOVERNMENT");
+    if (!isNonprofitType) return true;
+  }
+  return false;
+}
+
+// ── NONPROFIT: Static Source Buckets ─────────────────────────────────────────
+// Priority order: A (local) → B (state MH) → C (regional foundations) → D (corporate) → E (federal)
+
+type StaticBucket = Omit<SourceBucket, "recommendedSearchTerms">;
+
+const NONPROFIT_STATIC_BUCKETS: StaticBucket[] = [
+  {
+    id: "shelby-county",
+    name: "Shelby County / Local Community Foundation",
+    category: "A",
+    categoryLabel: "Indiana / Local Sources",
+    url: "https://www.shelbycf.org/",
+    description:
+      "Shelby County community foundation and local funders. Strong preference for Shelby County-based organizations and initiatives.",
+    fitReason:
+      "Highest priority for geographically rooted Shelby County nonprofits doing direct community outreach.",
+    verificationNeeded: true,
+  },
+  {
+    id: "indiana-fssa-dmha",
+    name: "Indiana FSSA / DMHA",
+    category: "A",
+    categoryLabel: "Indiana / Local Sources",
+    url: "https://www.in.gov/fssa/dmha/",
+    description:
+      "Indiana Family and Social Services Administration — Division of Mental Health and Addiction. Funds mental health outreach, prevention, and community programs statewide.",
+    fitReason:
+      "Primary state funder for mental health awareness, suicide prevention, and community outreach in Indiana.",
+    verificationNeeded: true,
+  },
+  {
+    id: "prevention-insights",
+    name: "Prevention Insights / Indiana Prevention Funding",
+    category: "B",
+    categoryLabel: "Indiana Mental Health / Prevention",
+    url: "https://preventioninsights.iu.edu/",
+    description:
+      "Indiana University Prevention Insights tracks and aggregates prevention-focused funding across Indiana. Updated grant listings, trainings, and resource connections.",
+    fitReason:
+      "Specifically funds suicide prevention, mental health awareness, and stigma-reduction programs in Indiana.",
+    verificationNeeded: true,
+  },
+  {
+    id: "cicf",
+    name: "Central Indiana Community Foundation / Indianapolis Foundation",
+    category: "C",
+    categoryLabel: "Regional Community Foundations",
+    url: "https://www.cicf.org/",
+    description:
+      "CICF and The Indianapolis Foundation provide community-focused grants across central Indiana. Mental health and wellness are active grantmaking priorities.",
+    fitReason:
+      "Regional funder with mental health, community resilience, and equity-focused grant tracks.",
+    verificationNeeded: true,
+  },
+  {
+    id: "united-way",
+    name: "United Way of Central Indiana",
+    category: "C",
+    categoryLabel: "Regional Community Foundations",
+    url: "https://www.uwci.org/",
+    description:
+      "United Way of Central Indiana funds health, education, and financial stability. Mental health is a supported priority area with multiple grant programs.",
+    fitReason:
+      "Funds community mental health and wellness programs aligned with outreach and education missions.",
+    verificationNeeded: true,
+  },
+  {
+    id: "kicking-stigma",
+    name: "Kicking The Stigma Action Grants",
+    category: "D",
+    categoryLabel: "Corporate / Private Mental Health Funders",
+    url: "https://www.kickingthestigma.com/",
+    description:
+      "Indianapolis Colts Kicking The Stigma initiative provides action grants to organizations working to end mental health stigma.",
+    fitReason:
+      "Direct match: funds stigma-reduction, mental health awareness, and community outreach programs in Indiana.",
+    verificationNeeded: true,
+  },
+  {
+    id: "lilly-endowment",
+    name: "Lilly Endowment",
+    category: "D",
+    categoryLabel: "Corporate / Private Mental Health Funders",
+    url: "https://lillyendowment.org/",
+    description:
+      "Lilly Endowment funds Indiana community development, youth programs, and well-being initiatives. One of Indiana's largest private funders.",
+    fitReason:
+      "Large Indiana-based private funder with community wellbeing, youth, and mental health-adjacent grant tracks.",
+    verificationNeeded: true,
+  },
+  {
+    id: "grants-gov",
+    name: "Grants.gov (Federal Fallback)",
+    category: "E",
+    categoryLabel: "Federal Grants.gov Sources",
+    url: "https://grants.gov",
+    description:
+      "Federal grants database. Includes SAMHSA, CDC, and other mental health-adjacent federal funders. Use Grant Search above to query live.",
+    fitReason:
+      "Federal fallback — many federal mental health grants require clinical partners or licensed staff, so vet carefully before applying.",
+    verificationNeeded: false,
+  },
+];
+
+// ── BUSINESS: Static Source Buckets ──────────────────────────────────────────
+// Priority: A (Indiana/local biz) → B (Indiana tech/AI) → C (regional small biz) → D (corporate/private) → E (SBA/federal small biz) → F (Grants.gov federal)
+
+const BUSINESS_STATIC_BUCKETS: StaticBucket[] = [
+  {
+    id: "indiana-sbdc",
+    name: "Indiana SBDC — Small Business Development Center",
+    category: "A",
+    categoryLabel: "Indiana / Local Business Sources",
+    url: "https://www.isbdc.org/",
+    description:
+      "Indiana SBDC provides free consulting, training, and connections to local and state funding for Indiana small businesses and startups.",
+    fitReason:
+      "First stop for any Indiana small business seeking grants, loans, or state-backed funding opportunities.",
+    verificationNeeded: true,
+  },
+  {
+    id: "iedc",
+    name: "IEDC — Indiana Economic Development Corporation",
+    category: "A",
+    categoryLabel: "Indiana / Local Business Sources",
+    url: "https://iedc.in.gov/",
+    description:
+      "IEDC manages Indiana's economic development programs including technology growth grants, workforce development funding, and innovation incentives.",
+    fitReason:
+      "State funder focused on growing Indiana's technology and innovation sectors — directly relevant to AI and software companies.",
+    verificationNeeded: true,
+  },
+  {
+    id: "elevate-ventures",
+    name: "Elevate Ventures",
+    category: "B",
+    categoryLabel: "Indiana Tech / AI / Innovation",
+    url: "https://www.elevateventures.com/",
+    description:
+      "Elevate Ventures is Indiana's leading venture development organization, providing grants and investments to high-growth Indiana startups including tech and software companies.",
+    fitReason:
+      "Strongest match for Indiana-based AI and software startups seeking grant capital to build and scale.",
+    verificationNeeded: true,
+  },
+  {
+    id: "techpoint",
+    name: "TechPoint Foundation / Orr Fellowship",
+    category: "B",
+    categoryLabel: "Indiana Tech / AI / Innovation",
+    url: "https://techpoint.org/",
+    description:
+      "TechPoint advocates for Indiana's tech sector and connects startups with funding, talent, and partnerships. The TechPoint Foundation supports workforce and education initiatives in Indiana tech.",
+    fitReason:
+      "Indiana tech ecosystem hub — relevant for AI/software companies seeking funding, visibility, and ecosystem connections.",
+    verificationNeeded: true,
+  },
+  {
+    id: "indy-chamber",
+    name: "Indy Chamber / Regional Small Business Support",
+    category: "C",
+    categoryLabel: "Regional Small Business Support",
+    url: "https://www.indychamber.com/",
+    description:
+      "The Indy Chamber and affiliate organizations support central Indiana small businesses with grants, resources, and access to corporate partnerships.",
+    fitReason:
+      "Regional business support organization connecting Indiana small businesses with funding and growth resources.",
+    verificationNeeded: true,
+  },
+  {
+    id: "sba-sbir",
+    name: "SBA SBIR / STTR Program",
+    category: "E",
+    categoryLabel: "SBA / Federal Small Business",
+    url: "https://www.sbir.gov/",
+    description:
+      "The Small Business Innovation Research (SBIR) and Small Business Technology Transfer (STTR) programs provide competitive federal grants to small businesses doing R&D and technology development — including AI.",
+    fitReason:
+      "Direct match for AI and software companies developing innovative technology. Phase I awards up to $275K, Phase II up to $1.8M.",
+    verificationNeeded: false,
+  },
+  {
+    id: "sba-programs",
+    name: "SBA — Small Business Administration Programs",
+    category: "E",
+    categoryLabel: "SBA / Federal Small Business",
+    url: "https://www.sba.gov/",
+    description:
+      "SBA administers federal small business grants, loans, and programs including HUBZone, 8(a) business development, and underserved community programs.",
+    fitReason:
+      "Federal small business programs — some grant-based, many loan-based. Relevant for small business capacity building.",
+    verificationNeeded: false,
+  },
+  {
+    id: "grants-gov-biz",
+    name: "Grants.gov (Federal Fallback)",
+    category: "F",
+    categoryLabel: "Federal Grants.gov Sources",
+    url: "https://grants.gov",
+    description:
+      "Federal grants database. Use Grant Search above to query live. For-profit companies are eligible for a narrower set of federal grants — focus on technology, workforce, and economic development programs.",
+    fitReason:
+      "Federal fallback — most grants.gov opportunities are for nonprofits. Focus searches on NSF, DOE, DOD, and economic development agencies for small business eligibility.",
+    verificationNeeded: false,
+  },
+];
+
+// ── NONPROFIT: Disqualifier Rules ─────────────────────────────────────────────
+
+const NONPROFIT_DISQUALIFIERS: DisqualifierWarning[] = [
+  {
+    type: "Licensed Clinical Treatment",
+    description:
+      "Grant requires licensed clinical staff to deliver therapy or counseling on-site as a core program component.",
+    avoidance:
+      "Skip unless your profile lists a licensed clinical partner. Community awareness and education are different from clinical treatment delivery.",
+  },
+  {
+    type: "Medication-Assisted Treatment (MAT)",
+    description:
+      "Grant funds medication-assisted treatment programs requiring medical staff and prescribing authority.",
+    avoidance:
+      "Skip without a licensed healthcare or medical partner providing the MAT component.",
+  },
+  {
+    type: "Hospital / Clinic Operation",
+    description:
+      "Restricted to licensed hospitals, clinics, or healthcare facilities as the lead applicant.",
+    avoidance:
+      "Do not apply as lead unless your org operates or is affiliated with a licensed healthcare facility.",
+  },
+  {
+    type: "Adaptive Sports Programs",
+    description:
+      "Restricted to organizations delivering adaptive sports or therapeutic recreation programming.",
+    avoidance:
+      "Skip unless your org runs adaptive sports or therapeutic recreation as a core service.",
+  },
+  {
+    type: "Law Enforcement-Only",
+    description:
+      "Restricted to law enforcement agencies, police departments, or first-responder organizations.",
+    avoidance:
+      "Skip unless your org is a law enforcement entity or the grant allows a community partner to apply with a law enforcement lead.",
+  },
+  {
+    type: "School District-Only Eligibility",
+    description:
+      "Restricted to accredited K-12 school districts or Local Education Agencies (LEAs) as lead applicants.",
+    avoidance:
+      "Skip unless the org can apply as a sub-grantee through a school district as lead.",
+  },
+  {
+    type: "Government Agency-Only",
+    description:
+      "Restricted to government agencies or units of government (municipalities, counties, state agencies).",
+    avoidance:
+      "Skip without a qualifying government fiscal agent willing to act as lead applicant.",
+  },
+];
+
+// ── BUSINESS: Disqualifier Rules ──────────────────────────────────────────────
+
+const BUSINESS_DISQUALIFIERS: DisqualifierWarning[] = [
+  {
+    type: "Nonprofit-Only Eligibility",
+    description:
+      "Many grants on Grants.gov, foundations, and community funders are restricted to 501(c)(3) nonprofits as the lead applicant.",
+    avoidance:
+      "Skip nonprofit-only grants unless partnering with a qualifying nonprofit fiscal sponsor.",
+  },
+  {
+    type: "Academic / University Research",
+    description:
+      "Research grants often require a university or academic institution as the lead or principal investigator.",
+    avoidance:
+      "Skip pure research grants unless partnering with an Indiana university (IU, Purdue, IUPUI) as co-applicant. STTR allows this structure.",
+  },
+  {
+    type: "Hardware / Physical Product",
+    description:
+      "Some tech grants are specifically for hardware, manufacturing, or physical product development.",
+    avoidance:
+      "Skip hardware-focused grants unless NoCapsAI develops a hardware component. Stay focused on software, AI, and automation.",
+  },
+  {
+    type: "Government Agency-Only",
+    description:
+      "Some economic development and technology grants require a government agency as the lead applicant.",
+    avoidance:
+      "Skip government-only programs. Look for small business set-aside programs instead.",
+  },
+  {
+    type: "FDA-Regulated Health Tech",
+    description:
+      "Medical device or clinical decision-support grants often require FDA clearance pathway plans.",
+    avoidance:
+      "Skip unless NoCapsAI pursues an FDA-regulated health tech product line.",
+  },
+];
+
+// ── NONPROFIT: Project Angles ─────────────────────────────────────────────────
+
+const NONPROFIT_PROJECT_ANGLES: ProjectAngle[] = [
+  {
+    title: "Community Mental Health Awareness and Suicide Prevention Outreach",
+    description:
+      "Community events, campaigns, and programming that raise awareness, reduce stigma, and connect people with mental health resources.",
+  },
+  {
+    title: "Suicide Loss Survivor Support and Memorial Outreach",
+    description:
+      "Programs specifically serving individuals and families who have lost someone to suicide — grief support, peer connection, and community healing.",
+  },
+  {
+    title: "Youth and Family Mental Health Resource Connection",
+    description:
+      "Connecting youth and families to existing mental health resources through education, peer programs, and guided outreach.",
+  },
+  {
+    title: "Stigma Reduction and Peer Support Community Events",
+    description:
+      "Events and programming designed to reduce mental health stigma and build peer support networks across the community.",
+  },
+  {
+    title: "QR-Code Mental Health Resource Access Campaign",
+    description:
+      "Innovative outreach using printed QR codes to connect community members with mental health resources on-demand — posters, flyers, events.",
+  },
+  {
+    title: "Volunteer and Community Education Program",
+    description:
+      "Training community volunteers to recognize signs of mental health crisis, reduce stigma, and connect people with the right support.",
+  },
+];
+
+// ── BUSINESS: Project Angles ──────────────────────────────────────────────────
+
+const BUSINESS_PROJECT_ANGLES: ProjectAngle[] = [
+  {
+    title: "AI-Powered Nonprofit Operations Automation",
+    description:
+      "Building AI tools that reduce administrative burden for nonprofits — grant writing, reporting, donor management, and program tracking automation.",
+  },
+  {
+    title: "Workforce Development Through AI Tool Training",
+    description:
+      "Training Indiana workers and small business owners to use AI automation tools to improve productivity and economic outcomes.",
+  },
+  {
+    title: "Rural Indiana Small Business Technology Adoption",
+    description:
+      "Bringing AI and automation tools to underserved rural Indiana small businesses through accessible software and guided implementation.",
+  },
+  {
+    title: "Nonprofit Technology Capacity Building Platform",
+    description:
+      "Software-as-a-Service platform designed to increase operational capacity for resource-constrained nonprofits through intelligent automation.",
+  },
+  {
+    title: "AI Grant Writing and Grant Management Tools",
+    description:
+      "Purpose-built AI tools that help nonprofits and small businesses find, apply for, and manage grant opportunities more effectively.",
+  },
+  {
+    title: "Small Business AI Automation for Operational Efficiency",
+    description:
+      "AI-driven workflow automation reducing time spent on repetitive tasks — customer service, scheduling, reporting, and communications.",
+  },
+];
+
+// ── NONPROFIT: Do Not Chase ───────────────────────────────────────────────────
+
+const NONPROFIT_DO_NOT_CHASE: string[] = [
+  "Clinical treatment grants — require licensed therapists delivering therapy on-site as primary service",
+  "Medication-assisted treatment (MAT) grants — require medical staff and prescribing authority",
+  "Hospital grants — restricted to licensed healthcare facilities",
+  "Adaptive sports grants — require therapeutic recreation programming as core service",
+  "Grants requiring licensed therapists on staff as the primary program deliverers",
+  "Government agency-only grants — require a government entity as the lead applicant",
+];
+
+// ── BUSINESS: Do Not Chase ────────────────────────────────────────────────────
+
+const BUSINESS_DO_NOT_CHASE: string[] = [
+  "Nonprofit-only grants — NoCapsAI LLC is a for-profit entity, not a 501(c)(3)",
+  "Academic / university research grants — require university lead unless using STTR structure",
+  "Clinical / FDA-regulated health technology grants — without a medical device pathway",
+  "Hardware or physical product manufacturing grants — NoCapsAI is software-only",
+  "Adaptive sports or recreational therapy grants — not aligned with core mission",
+  "Law enforcement / first responder technology grants — highly specialized eligibility requirements",
+];
+
+// ── Keyword Extraction ────────────────────────────────────────────────────────
+
+interface ExtractedKeywords {
+  hasSuicidePrevention: boolean;
+  hasMentalHealth: boolean;
+  hasGrief: boolean;
+  hasPeerSupport: boolean;
+  hasStigmaReduction: boolean;
+  hasYouth: boolean;
+  hasFamily: boolean;
+  hasAI: boolean;
+  hasTech: boolean;
+  hasWorkforce: boolean;
+  hasNonprofitSupport: boolean;
+  stateLabel: string;
+  countyLabel: string | null;
+  cityLabel: string | null;
+}
+
+function extractKeywords(org: OrgProfileSnapshot): ExtractedKeywords {
+  const text = [
+    org.missionStatement ?? "",
+    org.programsServices ?? "",
+    org.targetPopulation ?? "",
+    org.pastGrantsNarrative ?? "",
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  const geo = [org.geographicArea ?? "", org.city ?? "", org.state ?? ""]
+    .join(" ")
+    .toLowerCase();
+
+  const rawState = org.state ?? "Indiana";
+  const stateLabel =
+    rawState === "IN" || rawState.toLowerCase() === "indiana" ? "Indiana" : rawState;
+
+  const hasShelby =
+    geo.includes("shelby") ||
+    (org.city ?? "").toLowerCase().includes("shelbyville") ||
+    (org.geographicArea ?? "").toLowerCase().includes("shelby");
+
+  return {
+    hasSuicidePrevention:
+      text.includes("suicide") ||
+      text.includes("suicid") ||
+      text.includes("suicide prevention"),
+    hasMentalHealth:
+      text.includes("mental health") ||
+      text.includes("behavioral health") ||
+      text.includes("mental wellness"),
+    hasGrief:
+      text.includes("grief") ||
+      text.includes("loss survivor") ||
+      text.includes("bereavement") ||
+      text.includes("loss of "),
+    hasPeerSupport:
+      text.includes("peer support") ||
+      text.includes("peer-to-peer") ||
+      text.includes("peer program"),
+    hasStigmaReduction:
+      text.includes("stigma") ||
+      text.includes("destigma") ||
+      text.includes("stigma reduction"),
+    hasYouth:
+      text.includes("youth") ||
+      text.includes("teen") ||
+      text.includes("adolescent") ||
+      text.includes("young people"),
+    hasFamily:
+      text.includes("family") ||
+      text.includes("families") ||
+      text.includes("caregiver"),
+    hasAI:
+      text.includes("artificial intelligence") ||
+      text.includes("ai ") ||
+      text.includes(" ai") ||
+      text.includes("machine learning") ||
+      text.includes("automation"),
+    hasTech:
+      text.includes("software") ||
+      text.includes("technology") ||
+      text.includes("tech") ||
+      text.includes("platform") ||
+      text.includes("app ") ||
+      text.includes("saas"),
+    hasWorkforce:
+      text.includes("workforce") ||
+      text.includes("job") ||
+      text.includes("employment") ||
+      text.includes("training"),
+    hasNonprofitSupport:
+      text.includes("nonprofit") ||
+      text.includes("non-profit") ||
+      text.includes("501") ||
+      text.includes("grant writer"),
+    stateLabel,
+    countyLabel: hasShelby ? "Shelby County" : null,
+    cityLabel:
+      org.city && org.city.trim().length > 0 ? org.city.trim() : null,
+  };
+}
+
+// ── NONPROFIT: Search Strategy Builder ───────────────────────────────────────
+
+function buildNonprofitStrategies(
+  org: OrgProfileSnapshot,
+  kw: ExtractedKeywords
+): SearchStrategy[] {
+  const { stateLabel, countyLabel, cityLabel } = kw;
+  const strategies: SearchStrategy[] = [];
+
+  if (countyLabel) {
+    strategies.push({
+      term: `${countyLabel} ${stateLabel} nonprofit grants`,
+      priority: "high",
+      categoryLabel: "Local",
+      suggestedSources: ["Shelby County / Local Community Foundation", "CICF"],
+    });
+  }
+
+  if (kw.hasSuicidePrevention) {
+    strategies.push({
+      term: `${stateLabel} suicide prevention nonprofit grants`,
+      priority: "high",
+      categoryLabel: "Indiana / State",
+      suggestedSources: [
+        "Indiana FSSA / DMHA",
+        "Prevention Insights",
+        "Kicking The Stigma",
+      ],
+    });
+    strategies.push({
+      term: "suicide loss survivor support grants",
+      priority: "high",
+      categoryLabel: "Indiana / National",
+      suggestedSources: [
+        "Prevention Insights",
+        "Kicking The Stigma",
+        "Grants.gov",
+      ],
+    });
+  }
+
+  if (kw.hasMentalHealth) {
+    strategies.push({
+      term: `${stateLabel} mental health awareness grants`,
+      priority: "high",
+      categoryLabel: "Indiana / State",
+      suggestedSources: [
+        "Indiana FSSA / DMHA",
+        "Prevention Insights",
+        "CICF",
+      ],
+    });
+    strategies.push({
+      term: `community mental health outreach ${stateLabel}`,
+      priority: "medium",
+      categoryLabel: "Indiana / Regional",
+      suggestedSources: ["CICF", "United Way", "Lilly Endowment"],
+    });
+  }
+
+  if (kw.hasGrief) {
+    strategies.push({
+      term: `${stateLabel} grief support grants`,
+      priority: "high",
+      categoryLabel: "Indiana / State",
+      suggestedSources: [
+        "Indiana FSSA / DMHA",
+        "CICF",
+        countyLabel ?? "Lilly Endowment",
+      ],
+    });
+  }
+
+  if (kw.hasPeerSupport) {
+    strategies.push({
+      term: `peer support ${stateLabel} grants`,
+      priority: "medium",
+      categoryLabel: "Indiana / State",
+      suggestedSources: ["Indiana FSSA / DMHA", "Prevention Insights"],
+    });
+  }
+
+  if (kw.hasStigmaReduction) {
+    strategies.push({
+      term: "mental health stigma reduction grants",
+      priority: "medium",
+      categoryLabel: "Corporate / National",
+      suggestedSources: ["Kicking The Stigma", "Lilly Endowment"],
+    });
+  }
+
+  if (kw.hasYouth) {
+    strategies.push({
+      term: `youth mental health ${stateLabel} grants`,
+      priority: "medium",
+      categoryLabel: "Indiana / Regional",
+      suggestedSources: ["CICF", "Lilly Endowment", "United Way"],
+    });
+  }
+
+  if (cityLabel) {
+    strategies.push({
+      term: `${cityLabel} Indiana nonprofit grants`,
+      priority: "medium",
+      categoryLabel: "Local",
+      suggestedSources: [
+        "Shelby County / Local Community Foundation",
+        "CICF",
+      ],
+    });
+  }
+
+  strategies.push({
+    term: `nonprofit community outreach ${stateLabel} grants`,
+    priority: "medium",
+    categoryLabel: "Indiana / Regional",
+    suggestedSources: ["CICF", "United Way", "Lilly Endowment"],
+  });
+
+  strategies.push({
+    term: `${stateLabel} nonprofit mental health outreach grants`,
+    priority: "medium",
+    categoryLabel: "Indiana / Regional",
+    suggestedSources: ["CICF", "United Way", "Lilly Endowment"],
+  });
+
+  if (kw.hasSuicidePrevention || kw.hasMentalHealth) {
+    strategies.push({
+      term: "SAMHSA suicide prevention community programs",
+      priority: "low",
+      categoryLabel: "Federal",
+      suggestedSources: ["Grants.gov"],
+    });
+    strategies.push({
+      term: "CDC mental health community outreach funding",
+      priority: "low",
+      categoryLabel: "Federal",
+      suggestedSources: ["Grants.gov"],
+    });
+  }
+
+  const seen = new Set<string>();
+  return strategies.filter((s) => {
+    if (seen.has(s.term)) return false;
+    seen.add(s.term);
+    return true;
+  });
+}
+
+// ── BUSINESS: Search Strategy Builder ────────────────────────────────────────
+
+function buildBusinessStrategies(
+  org: OrgProfileSnapshot,
+  kw: ExtractedKeywords
+): SearchStrategy[] {
+  const { stateLabel } = kw;
+  const strategies: SearchStrategy[] = [];
+
+  // A — Indiana local
+  strategies.push({
+    term: `${stateLabel} small business technology grants`,
+    priority: "high",
+    categoryLabel: "Indiana / Local",
+    suggestedSources: ["Indiana SBDC", "IEDC"],
+  });
+
+  strategies.push({
+    term: `${stateLabel} small business innovation grants`,
+    priority: "high",
+    categoryLabel: "Indiana / Local",
+    suggestedSources: ["Indiana SBDC", "IEDC", "Elevate Ventures"],
+  });
+
+  // B — Indiana tech/AI
+  if (kw.hasAI || kw.hasTech) {
+    strategies.push({
+      term: `${stateLabel} AI automation startup grants`,
+      priority: "high",
+      categoryLabel: "Indiana Tech / AI",
+      suggestedSources: ["Elevate Ventures", "TechPoint", "IEDC"],
+    });
+    strategies.push({
+      term: `${stateLabel} software startup funding`,
+      priority: "high",
+      categoryLabel: "Indiana Tech / AI",
+      suggestedSources: ["Elevate Ventures", "TechPoint"],
+    });
+    strategies.push({
+      term: "Elevate Ventures Indiana tech grant",
+      priority: "high",
+      categoryLabel: "Indiana Tech / AI",
+      suggestedSources: ["Elevate Ventures"],
+    });
+  }
+
+  // B — nonprofit support angle
+  if (kw.hasNonprofitSupport) {
+    strategies.push({
+      term: "technology tools for nonprofits grant",
+      priority: "high",
+      categoryLabel: "Indiana Tech / Nonprofit Support",
+      suggestedSources: ["Elevate Ventures", "CICF", "Lilly Endowment"],
+    });
+    strategies.push({
+      term: "nonprofit technology capacity building Indiana",
+      priority: "medium",
+      categoryLabel: "Indiana Tech / Nonprofit Support",
+      suggestedSources: ["Elevate Ventures", "IEDC"],
+    });
+  }
+
+  // C — regional
+  strategies.push({
+    term: `${stateLabel} startup ecosystem grants`,
+    priority: "medium",
+    categoryLabel: "Regional Small Business",
+    suggestedSources: ["Indy Chamber", "TechPoint", "Indiana SBDC"],
+  });
+
+  // D — workforce
+  if (kw.hasWorkforce || kw.hasAI) {
+    strategies.push({
+      term: `workforce development AI technology training ${stateLabel}`,
+      priority: "medium",
+      categoryLabel: "Workforce / Training",
+      suggestedSources: ["IEDC", "Indiana SBDC", "Grants.gov"],
+    });
+  }
+
+  // E — SBIR/SBA
+  strategies.push({
+    term: "SBA SBIR artificial intelligence grants",
+    priority: "medium",
+    categoryLabel: "SBA / Federal Small Business",
+    suggestedSources: ["SBA SBIR / STTR Program"],
+  });
+
+  strategies.push({
+    term: "STTR AI software startup grants",
+    priority: "medium",
+    categoryLabel: "SBA / Federal Small Business",
+    suggestedSources: ["SBA SBIR / STTR Program"],
+  });
+
+  if (kw.hasAI) {
+    strategies.push({
+      term: "NSF SBIR artificial intelligence Phase I",
+      priority: "medium",
+      categoryLabel: "SBA / Federal Small Business",
+      suggestedSources: ["SBA SBIR / STTR Program", "Grants.gov"],
+    });
+  }
+
+  // F — federal fallback
+  strategies.push({
+    term: "federal small business technology grants",
+    priority: "low",
+    categoryLabel: "Federal",
+    suggestedSources: ["Grants.gov (Federal Fallback)"],
+  });
+
+  strategies.push({
+    term: "DOE small business innovation research AI",
+    priority: "low",
+    categoryLabel: "Federal",
+    suggestedSources: ["Grants.gov (Federal Fallback)", "SBA SBIR / STTR Program"],
+  });
+
+  const seen = new Set<string>();
+  return strategies.filter((s) => {
+    if (seen.has(s.term)) return false;
+    seen.add(s.term);
+    return true;
+  });
+}
+
+// ── Source Term Mapping — Nonprofit ──────────────────────────────────────────
+
+function attachNonprofitSearchTerms(
+  strategies: SearchStrategy[],
+  kw: ExtractedKeywords
+): SourceBucket[] {
+  const termsFor = (sourceNameIncludes: string[]): string[] =>
+    strategies
+      .filter((s) =>
+        s.suggestedSources.some((src) =>
+          sourceNameIncludes.some((name) =>
+            src.toLowerCase().includes(name.toLowerCase())
+          )
+        )
+      )
+      .map((s) => s.term)
+      .slice(0, 3);
+
+  return NONPROFIT_STATIC_BUCKETS.map((bucket): SourceBucket => {
+    let terms: string[] = [];
+
+    switch (bucket.id) {
+      case "shelby-county":
+        terms = termsFor(["Shelby"]);
+        if (terms.length === 0)
+          terms = [
+            `${kw.stateLabel} local community foundation grants`,
+            "community mental health outreach grants",
+          ];
+        break;
+      case "indiana-fssa-dmha":
+        terms = termsFor(["FSSA", "DMHA"]);
+        if (terms.length === 0)
+          terms = [
+            `${kw.stateLabel} mental health outreach grants`,
+            "suicide prevention nonprofit grants",
+          ];
+        break;
+      case "prevention-insights":
+        terms = termsFor(["Prevention Insights", "Prevention"]);
+        if (terms.length === 0)
+          terms = [
+            "Indiana suicide prevention grants",
+            "mental health awareness Indiana",
+          ];
+        break;
+      case "cicf":
+        terms = termsFor(["CICF", "Community Foundation"]);
+        if (terms.length === 0)
+          terms = [
+            "community mental health outreach Indiana",
+            "youth mental health Indiana grants",
+          ];
+        break;
+      case "united-way":
+        terms = [
+          "mental health community outreach Indiana",
+          "nonprofit wellness programs Indiana",
+        ];
+        break;
+      case "kicking-stigma":
+        terms = [
+          "mental health stigma reduction community",
+          "suicide prevention awareness outreach",
+        ];
+        break;
+      case "lilly-endowment":
+        terms = [
+          "Indiana nonprofit community wellbeing",
+          "youth mental health Indiana grants",
+          "community education mental health",
+        ];
+        break;
+      case "grants-gov":
+        terms = strategies
+          .filter((s) => s.priority === "low")
+          .map((s) => s.term)
+          .slice(0, 3);
+        if (terms.length === 0) terms = ["SAMHSA mental health community programs"];
+        break;
+      default:
+        terms = ["mental health community outreach"];
+    }
+
+    return { ...bucket, recommendedSearchTerms: terms };
+  });
+}
+
+// ── Source Term Mapping — Business ────────────────────────────────────────────
+
+function attachBusinessSearchTerms(
+  strategies: SearchStrategy[],
+  kw: ExtractedKeywords
+): SourceBucket[] {
+  const termsFor = (sourceNameIncludes: string[]): string[] =>
+    strategies
+      .filter((s) =>
+        s.suggestedSources.some((src) =>
+          sourceNameIncludes.some((name) =>
+            src.toLowerCase().includes(name.toLowerCase())
+          )
+        )
+      )
+      .map((s) => s.term)
+      .slice(0, 3);
+
+  return BUSINESS_STATIC_BUCKETS.map((bucket): SourceBucket => {
+    let terms: string[] = [];
+
+    switch (bucket.id) {
+      case "indiana-sbdc":
+        terms = termsFor(["SBDC"]);
+        if (terms.length === 0)
+          terms = [
+            "Indiana small business technology grants",
+            "Indiana small business innovation grants",
+          ];
+        break;
+      case "iedc":
+        terms = termsFor(["IEDC"]);
+        if (terms.length === 0)
+          terms = [
+            "IEDC technology company grants Indiana",
+            "Indiana economic development tech grants",
+          ];
+        break;
+      case "elevate-ventures":
+        terms = termsFor(["Elevate"]);
+        if (terms.length === 0)
+          terms = [
+            "Elevate Ventures Indiana tech grant",
+            "Indiana AI startup funding",
+          ];
+        break;
+      case "techpoint":
+        terms = termsFor(["TechPoint"]);
+        if (terms.length === 0)
+          terms = [
+            "Indiana tech startup ecosystem grants",
+            "Indiana software company funding",
+          ];
+        break;
+      case "indy-chamber":
+        terms = [
+          "Indiana startup ecosystem grants",
+          "central Indiana small business grants",
+        ];
+        break;
+      case "sba-sbir":
+        terms = termsFor(["SBIR", "STTR"]);
+        if (terms.length === 0)
+          terms = [
+            "SBA SBIR artificial intelligence grants",
+            "STTR AI software startup grants",
+            "NSF SBIR Phase I technology",
+          ];
+        break;
+      case "sba-programs":
+        terms = [
+          "SBA small business grants",
+          "federal small business development programs",
+        ];
+        break;
+      case "grants-gov-biz":
+        terms = strategies
+          .filter((s) => s.priority === "low")
+          .map((s) => s.term)
+          .slice(0, 3);
+        if (terms.length === 0)
+          terms = ["federal small business technology grants"];
+        break;
+      default:
+        terms = ["small business technology grants"];
+    }
+
+    return { ...bucket, recommendedSearchTerms: terms };
+  });
+}
+
+// ── Main Export ───────────────────────────────────────────────────────────────
+
+export function generateFundingScout(org: OrgProfileSnapshot): FundingScoutReport {
+  const kw = extractKeywords(org);
+  const isBusiness = isBusinessProfile(org);
+
+  if (isBusiness) {
+    const strategies = buildBusinessStrategies(org, kw);
+    const sourceBuckets = attachBusinessSearchTerms(strategies, kw);
+    return {
+      orgName: org.name,
+      generatedAt: new Date(),
+      profileCompleteness: org.profileCompleteness ?? 0,
+      searchStrategies: strategies,
+      sourceBuckets,
+      projectAngles: BUSINESS_PROJECT_ANGLES,
+      doNotChase: BUSINESS_DO_NOT_CHASE,
+      disqualifierWarnings: BUSINESS_DISQUALIFIERS,
+    };
+  }
+
+  // Nonprofit path (default)
+  const strategies = buildNonprofitStrategies(org, kw);
+  const sourceBuckets = attachNonprofitSearchTerms(strategies, kw);
+
+  return {
+    orgName: org.name,
+    generatedAt: new Date(),
+    profileCompleteness: org.profileCompleteness ?? 0,
+    searchStrategies: strategies,
+    sourceBuckets,
+    projectAngles: NONPROFIT_PROJECT_ANGLES,
+    doNotChase: NONPROFIT_DO_NOT_CHASE,
+    disqualifierWarnings: NONPROFIT_DISQUALIFIERS,
+  };
+}
+
+// ── Category Metadata ─────────────────────────────────────────────────────────
+
+export const CATEGORY_META: Record<
+  SourceCategory,
+  { label: string; colorClass: string; badgeClass: string }
+> = {
+  A: {
+    label: "A — Indiana / Local",
+    colorClass: "text-green-700",
+    badgeClass: "bg-green-100 text-green-700",
+  },
+  B: {
+    label: "B — State / Sector-Specific",
+    colorClass: "text-teal-700",
+    badgeClass: "bg-teal-100 text-teal-700",
+  },
+  C: {
+    label: "C — Regional Foundations / Support",
+    colorClass: "text-blue-700",
+    badgeClass: "bg-blue-100 text-blue-700",
+  },
+  D: {
+    label: "D — Corporate / Private",
+    colorClass: "text-purple-700",
+    badgeClass: "bg-purple-100 text-purple-700",
+  },
+  E: {
+    label: "E — Federal Small Business / SBA",
+    colorClass: "text-orange-700",
+    badgeClass: "bg-orange-100 text-orange-700",
+  },
+  F: {
+    label: "F — Federal Grants.gov (Fallback)",
+    colorClass: "text-gray-600",
+    badgeClass: "bg-gray-100 text-gray-600",
+  },
+};

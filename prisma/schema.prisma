@@ -1,0 +1,724 @@
+// GrantFlow AI â€” Prisma Schema
+// All 18 core models with full relations, enums, and audit fields
+// Run: npx prisma migrate dev --name init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// -----------------------------------------------------------------------------
+// ENUMS
+// -----------------------------------------------------------------------------
+
+enum UserRole {
+  OWNER       // Full access to org + billing
+  ADMIN       // Full access, no billing
+  WRITER      // Can create and edit applications
+  VIEWER      // Read-only
+}
+
+enum OrgType {
+  NONPROFIT_501C3
+  NONPROFIT_501C4
+  NONPROFIT_OTHER
+  SMALL_BUSINESS
+  SCHOOL_K12
+  HIGHER_EDUCATION
+  GOVERNMENT
+  TRIBAL
+  COMMUNITY_GROUP
+  INDIVIDUAL
+  OTHER
+}
+
+enum DocumentType {
+  IRS_DETERMINATION_LETTER
+  ARTICLES_OF_INCORPORATION
+  BYLAWS
+  FINANCIAL_STATEMENTS
+  AUDIT_REPORT
+  BUDGET
+  BOARD_LIST
+  STAFF_RESUMES
+  ANNUAL_REPORT
+  PROJECT_PLAN
+  LOGIC_MODEL
+  LETTER_OF_SUPPORT
+  PROOF_OF_IMPACT
+  PHOTO_VIDEO
+  FLYER_MARKETING
+  OTHER
+}
+
+enum DocumentStatus {
+  ACTIVE
+  EXPIRING_SOON    // Within 90 days
+  EXPIRED
+  NEEDS_UPDATE
+}
+
+enum GrantSourceType {
+  FEDERAL_GOVERNMENT   // grants.gov, SAM.gov
+  STATE_GOVERNMENT
+  LOCAL_GOVERNMENT
+  PRIVATE_FOUNDATION
+  CORPORATE_FOUNDATION
+  COMMUNITY_FOUNDATION
+  INTERNAL             // User-added sources
+}
+
+enum DataQuality {
+  VERIFIED     // Pulled directly from official source
+  SCRAPED      // Web-scraped, may have errors
+  UNCERTAIN    // Source unavailable at time of fetch
+  USER_ADDED   // Manually entered by user
+}
+
+enum SubmissionMethod {
+  ONLINE_PORTAL
+  GRANTS_GOV
+  EMAIL
+  PDF_UPLOAD
+  MAIL
+  MANUAL
+}
+
+enum ApplicationStatus {
+  DRAFTING
+  NEEDS_REVIEW
+  READY_TO_SUBMIT
+  SUBMITTED
+  FOLLOW_UP_NEEDED
+  AWARDED
+  DENIED
+  REPORTING_REQUIRED
+  CLOSED
+}
+
+enum AgentType {
+  SEARCH
+  ELIGIBILITY
+  STRATEGY
+  WRITER
+  BUDGET
+  DOCUMENT
+  COMPLIANCE
+  SUBMISSION
+  TRACKING
+  REPORTING
+}
+
+enum AgentStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  SNOOZED
+  CANCELLED
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+}
+
+enum BudgetCategory {
+  PERSONNEL
+  FRINGE_BENEFITS
+  CONSULTANTS
+  CONTRACTED_SERVICES
+  EQUIPMENT
+  SUPPLIES
+  TRAVEL
+  TECHNOLOGY
+  MARKETING
+  INDIRECT_COSTS
+  MATCHING_FUNDS
+  OTHER
+}
+
+// -----------------------------------------------------------------------------
+// USER + AUTH
+// -----------------------------------------------------------------------------
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  name          String?
+  image         String?
+  passwordHash  String?   // null if using OAuth only
+
+  role          UserRole  @default(WRITER)
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+
+  // Multi-profile: all orgs this user has created
+  createdOrganizations Organization[] @relation("OrgCreator")
+
+  notifications  Notification[]
+  agentRuns      AgentRun[]     @relation("TriggeredBy")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // NextAuth adapter fields
+  accounts Account[]
+  sessions Session[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// -----------------------------------------------------------------------------
+// ORGANIZATION
+// -----------------------------------------------------------------------------
+
+model Organization {
+  id   String  @id @default(cuid())
+  name String
+
+  // Legal + tax info
+  ein            String?   // Employer Identification Number
+  orgType        OrgType   @default(NONPROFIT_501C3)
+  nonprofitStatus String?  // "501(c)(3)", "501(c)(4)", etc.
+  incorporatedDate DateTime?
+  stateOfIncorporation String?
+
+  // Mission + description
+  missionStatement  String? @db.Text
+  visionStatement   String? @db.Text
+  programsServices  String? @db.Text // Rich text description of programs
+  geographicArea    String? // Location served (city, county, state, national)
+  targetPopulation  String? // Who the org serves
+
+  // Contact
+  website     String?
+  phone       String?
+  email       String?
+  addressLine1 String?
+  addressLine2 String?
+  city        String?
+  state       String?
+  zip         String?
+
+  // Financial
+  annualBudget      Float?
+  fiscalYearEnd     String?  // e.g. "December 31"
+  hasAudit          Boolean  @default(false)
+
+  // Grant history
+  pastGrantsNarrative String? @db.Text // Free text describing past grants
+
+  // Completeness score (0-100, computed on save)
+  profileCompleteness Int @default(0)
+
+  // Multi-profile: tracks which user created this organization
+  // Enables querying all profiles belonging to a user
+  createdByUserId String?
+  createdBy       User?   @relation("OrgCreator", fields: [createdByUserId], references: [id])
+
+  users         User[]
+  documents     OrganizationDocument[]
+  applications  GrantApplication[]
+  searchQueries GrantSearchQuery[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// -----------------------------------------------------------------------------
+// ORGANIZATION DOCUMENTS
+// -----------------------------------------------------------------------------
+
+model OrganizationDocument {
+  id             String         @id @default(cuid())
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  type           DocumentType
+  name           String         // Display name
+  fileName       String         // Original file name
+  fileUrl        String         // Storage URL (local path in dev, S3 in prod)
+  fileSize       Int            // Bytes
+  mimeType       String
+
+  status         DocumentStatus @default(ACTIVE)
+  expiresAt      DateTime?      // For time-sensitive docs (audit, financials)
+  description    String?
+
+  // Which grant applications reference this doc
+  applications   GrantApplication[] @relation("ApplicationDocuments")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// -----------------------------------------------------------------------------
+// GRANT SOURCES + SEARCH
+// -----------------------------------------------------------------------------
+
+model GrantSource {
+  id          String          @id @default(cuid())
+  name        String          // "Grants.gov", "Indiana Community Foundation", etc.
+  type        GrantSourceType
+  baseUrl     String
+  description String?
+  isActive    Boolean         @default(true)
+  lastCrawled DateTime?
+  crawlConfig Json?           // Source-specific scraping config
+
+  opportunities GrantOpportunity[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model GrantSearchQuery {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  rawQuery       String       // Original natural language query
+  parsedFilters  Json         // Structured filters extracted by LLM
+  resultsCount   Int          @default(0)
+
+  opportunities  GrantOpportunity[]
+
+  agentRun       AgentRun?    @relation(fields: [agentRunId], references: [id])
+  agentRunId     String?
+
+  createdAt DateTime @default(now())
+}
+
+// -----------------------------------------------------------------------------
+// GRANT OPPORTUNITY
+// -----------------------------------------------------------------------------
+
+model GrantOpportunity {
+  id    String @id @default(cuid())
+
+  // Core grant info â€” all sourced, never hallucinated
+  title       String
+  funder      String
+  description String  @db.Text
+  category    String  // e.g. "Health", "Youth", "Arts", "Education"
+  focusAreas  String[] // Multiple tags
+
+  // Eligibility
+  eligibility      String? @db.Text
+  orgTypesAllowed  OrgType[]
+  locationRestriction String? // "Indiana only", "National", etc.
+  locationStates   String[]
+
+  // Award details
+  awardMin    Float?
+  awardMax    Float?
+  awardTypical Float?  // Most common award amount
+
+  // Deadlines
+  deadline          DateTime?
+  isRolling         Boolean @default(false)
+  nextDeadline      DateTime? // For rolling deadlines
+
+  // Application details
+  applicationUrl    String?   // Direct link to apply
+  portalName        String?   // "Submittable", "Fluxx", "GrantsGov", etc.
+  submissionMethod  SubmissionMethod @default(ONLINE_PORTAL)
+  requiredDocuments String[]  // List of required doc names
+  wordLimits        Json?     // { "narrative": 2000, "executive_summary": 500 }
+  requirements      String?   @db.Text
+
+  // Source tracking â€” REQUIRED. No opportunity without a source URL.
+  sourceUrl     String        // Original URL where this grant was found
+  sourceId      String?
+  source        GrantSource?  @relation(fields: [sourceId], references: [id])
+  dataQuality   DataQuality   @default(SCRAPED)
+  lastVerified  DateTime?
+
+  // Phase 3: Live search identity
+  externalId    String?  @unique // Grants.gov numeric ID â€” enables upsert dedup
+  originSource  String   @default("SEED") // "SEED" | "GRANTS_GOV" | "MANUAL"
+
+  // Scoring
+  matchScore      Float?      // 0-100 match to current org (computed)
+  confidenceScore Float?      // 0-100 confidence in data accuracy
+  isActive        Boolean     @default(true)
+
+  // Relations
+  applications    GrantApplication[]
+  searchQueries   GrantSearchQuery[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([deadline])
+  @@index([category])
+  @@index([isActive])
+}
+
+// -----------------------------------------------------------------------------
+// GRANT APPLICATION
+// -----------------------------------------------------------------------------
+
+model GrantApplication {
+  id             String            @id @default(cuid())
+  organizationId String
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  opportunityId  String
+  opportunity    GrantOpportunity  @relation(fields: [opportunityId], references: [id])
+
+  status         ApplicationStatus @default(DRAFTING)
+
+  // Application details
+  projectTitle   String?
+  projectSummary String?           @db.Text
+  requestedAmount Float?
+  matchingAmount  Float?           // Matching funds if required
+
+  // Key dates
+  deadline       DateTime?
+  submittedAt    DateTime?
+  decisionDate   DateTime?         // Expected or actual decision date
+  reportDueDate  DateTime?
+
+  // Outcome
+  awardStatus    String?           // "Awarded $25,000", "Denied", null
+  awardAmount    Float?
+  // Timeline / Decision Tracker (all nullable, additive)
+  grantType             String?   // "LOCAL" | "CORPORATE" | "STATE" | "FEDERAL" | "CUSTOM"
+  decisionStatus        String?   // "NOT_SUBMITTED"|"SUBMITTED_WAITING"|"FOLLOW_UP_NEEDED"|"AWARDED"|"DECLINED"|"WAITLISTED"|"REPORTING_DUE"|"CLOSED"
+  expectedDecisionStart DateTime? // Start of funder's typical decision window
+  expectedDecisionEnd   DateTime? // End of funder's typical decision window
+  followUpDate          DateTime? // Suggested date to follow up with funder
+  contractStatus        String?   // "NOT_STARTED"|"PENDING"|"SIGNED"|"NOT_REQUIRED"
+  fundsReceivedStatus   String?   // "NOT_RECEIVED"|"PARTIAL"|"RECEIVED"|"NOT_APPLICABLE"
+
+  // Submission tracking
+  portalUrl      String?           // URL of submission portal
+  portalUsername String?           // Login hints (NOT password)
+  submissionNotes String?          @db.Text
+  submissionMethod SubmissionMethod?
+
+  // Internal notes
+  notes          String?           @db.Text
+  internalScore  Int?              // User's own priority score 1-5
+
+  // Compliance readiness (set by Compliance Agent)
+  readinessScore Int?              // 0-100
+
+  // Relations
+  sections       GrantApplicationSection[]
+  budget         GrantBudget?
+  tasks          GrantTask[]
+  statusUpdates  GrantStatusUpdate[]
+  submission     GrantSubmission?
+  reports        GrantReport[]
+  documents      OrganizationDocument[] @relation("ApplicationDocuments")
+  agentRuns      AgentRun[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([deadline])
+  @@index([organizationId])
+}
+
+// -----------------------------------------------------------------------------
+// APPLICATION SECTIONS (Grant Writer Agent output)
+// -----------------------------------------------------------------------------
+
+model GrantApplicationSection {
+  id            String           @id @default(cuid())
+  applicationId String
+  application   GrantApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  // Section identity
+  sectionType   String           // "executive_summary", "statement_of_need", etc.
+  title         String           // Display title
+  sortOrder     Int              @default(0)
+
+  // Content â€” all versions saved, current is the latest
+  content       String?          @db.Text  // Current draft
+  wordCount     Int?
+  wordLimit     Int?
+  charLimit     Int?
+
+  // Status
+  isApproved    Boolean          @default(false)
+  isLocked      Boolean          @default(false) // Prevent AI overwrites after approval
+  lastEditedBy  String?          // userId
+
+  // Version history â€” stored as JSON array of {content, editedAt, editedBy}
+  versions      Json             @default("[]")
+
+  agentRunId    String?
+  agentRun      AgentRun?        @relation(fields: [agentRunId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([applicationId, sectionType])
+  @@index([applicationId])
+}
+
+// -----------------------------------------------------------------------------
+// BUDGET
+// -----------------------------------------------------------------------------
+
+model GrantBudget {
+  id            String           @id @default(cuid())
+  applicationId String           @unique
+  application   GrantApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  totalRequested Float            @default(0)
+  totalMatching  Float            @default(0)
+  totalProject   Float            @default(0) // requested + matching
+
+  narrativeSummary String?        @db.Text
+  notes            String?        @db.Text
+
+  lineItems      GrantBudgetLineItem[]
+
+  agentRunId    String?
+  agentRun      AgentRun?        @relation(fields: [agentRunId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model GrantBudgetLineItem {
+  id       String           @id @default(cuid())
+  budgetId String
+  budget   GrantBudget      @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+
+  category     BudgetCategory
+  description  String
+  quantity     Float          @default(1)
+  unit         String?        // "hours", "FTE", "units"
+  unitCost     Float
+  totalCost    Float
+  isMatching   Boolean        @default(false)
+  justification String?       @db.Text
+  isAllowable  Boolean?       // null = not checked, set by Compliance Agent
+  flagNote     String?        // Why it might not be allowable
+
+  sortOrder    Int            @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// -----------------------------------------------------------------------------
+// TASKS + STATUS TRACKING
+// -----------------------------------------------------------------------------
+
+model GrantTask {
+  id            String           @id @default(cuid())
+  applicationId String
+  application   GrantApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  title         String
+  description   String?          @db.Text
+  status        TaskStatus       @default(PENDING)
+  dueDate       DateTime?
+  completedAt   DateTime?
+  assignedTo    String?          // userId
+  isAutoGenerated Boolean        @default(false) // Set by Tracking Agent
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([applicationId, status])
+}
+
+model GrantStatusUpdate {
+  id            String           @id @default(cuid())
+  applicationId String
+  application   GrantApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  fromStatus    ApplicationStatus?
+  toStatus      ApplicationStatus
+  note          String?           @db.Text
+  changedBy     String?           // userId or "system"
+  agentRunId    String?
+
+  createdAt DateTime @default(now())
+}
+
+// -----------------------------------------------------------------------------
+// SUBMISSION
+// -----------------------------------------------------------------------------
+
+model GrantSubmission {
+  id            String           @id @default(cuid())
+  applicationId String           @unique
+  application   GrantApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  method        SubmissionMethod
+  submittedAt   DateTime?
+
+  // Submission details
+  confirmationNumber String?      // Portal confirmation number
+  submittedByUserId  String?      // User who confirmed submission
+  submittedVia       String?      // "Grants.gov portal", "email to grants@example.org"
+
+  // Checklist â€” generated by Submission Agent, checked by user
+  checklistItems Json             @default("[]")
+  // Format: [{ id, label, isCompleted, isRequired }]
+
+  // IMPORTANT: isConfirmedByUser must be true before status=SUBMITTED is set
+  // The system never auto-confirms. See lib/agents/submission-agent.ts
+  isConfirmedByUser Boolean       @default(false)
+
+  notes         String?           @db.Text
+
+  agentRunId    String?
+  agentRun      AgentRun?        @relation(fields: [agentRunId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// -----------------------------------------------------------------------------
+// REPORTS (post-award)
+// -----------------------------------------------------------------------------
+
+model GrantReport {
+  id            String           @id @default(cuid())
+  applicationId String
+  application   GrantApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  reportType    String           // "progress", "final", "impact", "financial"
+  title         String
+  dueDate       DateTime?
+  submittedAt   DateTime?
+  content       String?          @db.Text
+  isApproved    Boolean          @default(false)
+
+  agentRunId    String?
+  agentRun      AgentRun?        @relation(fields: [agentRunId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// -----------------------------------------------------------------------------
+// AGENT RUN AUDIT LOG
+// Every agent invocation is recorded here with full I/O for audit + debugging
+// -----------------------------------------------------------------------------
+
+model AgentRun {
+  id             String      @id @default(cuid())
+
+  agentType      AgentType
+  status         AgentStatus @default(PENDING)
+
+  // Context
+  applicationId  String?
+  application    GrantApplication? @relation(fields: [applicationId], references: [id])
+  triggeredById  String?
+  triggeredBy    User?       @relation("TriggeredBy", fields: [triggeredById], references: [id])
+
+  // LLM details
+  model          String?     // e.g. "gpt-4o"
+  promptTokens   Int?
+  completionTokens Int?
+  totalTokens    Int?
+  durationMs     Int?
+
+  // Full I/O stored for audit + regeneration
+  inputPayload   Json?       // Sanitized inputs sent to the agent
+  outputPayload  Json?       // Structured output from the agent
+  rawPrompt      String?     @db.Text
+  rawResponse    String?     @db.Text
+
+  // Error tracking
+  errorMessage   String?     @db.Text
+  retryCount     Int         @default(0)
+
+  // Relations (polymorphic-ish via optional FKs)
+  sections       GrantApplicationSection[]
+  budget         GrantBudget[]
+  reports        GrantReport[]
+  submission     GrantSubmission[]
+  searchQueries  GrantSearchQuery[]
+
+  startedAt     DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime    @default(now())
+
+  @@index([agentType, status])
+  @@index([applicationId])
+}
+
+// -----------------------------------------------------------------------------
+// NOTIFICATIONS
+// -----------------------------------------------------------------------------
+
+model Notification {
+  id      String              @id @default(cuid())
+  userId  String
+  user    User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  channel NotificationChannel @default(IN_APP)
+  title   String
+  message String              @db.Text
+  href    String?             // Link to relevant page
+
+  isRead  Boolean             @default(false)
+  readAt  DateTime?
+
+  // Context
+  applicationId  String?
+  opportunityId  String?
+
+  createdAt DateTime @default(now())
+}
+

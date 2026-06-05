@@ -1,0 +1,53 @@
+/**
+ * GrantFlow AI — Edge-compatible Auth Config
+ * Used by middleware (Edge Runtime — no Prisma, no bcrypt allowed here).
+ * Full auth config with Prisma adapter lives in auth.ts.
+ */
+import type { NextAuthConfig } from "next-auth";
+
+export const authConfig = {
+  session: { strategy: "jwt" },
+  secret: process.env.AUTH_SECRET,
+
+  pages: {
+    signIn: "/auth/login",
+    error: "/auth/error",
+  },
+
+  callbacks: {
+    authorized({ auth, request: { nextUrl } }) {
+      const isLoggedIn = !!auth?.user;
+      const isAuthPage = nextUrl.pathname.startsWith("/auth");
+      const isApiAuthRoute = nextUrl.pathname.startsWith("/api/auth");
+
+      // Always allow auth API routes
+      if (isApiAuthRoute) return true;
+
+      // Redirect logged-in users away from auth pages
+      if (isAuthPage) {
+        if (isLoggedIn) return Response.redirect(new URL("/dashboard", nextUrl));
+        return true;
+      }
+
+      // Require login for everything else
+      if (!isLoggedIn) return false;
+
+      return true;
+    },
+    // Lightweight JWT callback — no DB access here (Edge Runtime)
+    jwt({ token, user }) {
+      if (user?.id) token.sub = user.id;
+      return token;
+    },
+    session({ session, token }) {
+      if (token.sub) session.user.id = token.sub;
+      if (token.organizationId !== undefined) {
+        session.user.organizationId = token.organizationId as string | null;
+      }
+      if (token.role) session.user.role = token.role as string;
+      return session;
+    },
+  },
+
+  providers: [], // Actual providers are added in auth.ts
+} satisfies NextAuthConfig;
