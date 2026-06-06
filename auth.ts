@@ -37,7 +37,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       async authorize(credentials) {
         // ── Safe diagnostics ──────────────────────────────────────────────
         // Logs ONLY booleans + the normalized email. Never logs the raw
-        // password or the password hash. Visible in Vercel function logs.
+        // password or the password hash. Emitted via console.error so Vercel
+        // reliably surfaces them in the function logs.
         const emailReceived =
           typeof credentials?.email === "string" && credentials.email.length > 0;
         const passwordReceived =
@@ -46,12 +47,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           ? (credentials!.email as string).trim().toLowerCase()
           : "";
 
-        console.log("[auth][authorize] email received:", emailReceived);
-        console.log("[auth][authorize] normalized email:", normalizedEmail || "(none)");
-        console.log("[auth][authorize] password received:", passwordReceived);
+        console.error("[auth][authorize] email received:", emailReceived);
+        console.error("[auth][authorize] normalized email:", normalizedEmail || "(none)");
+        console.error("[auth][authorize] password received:", passwordReceived);
 
         if (!emailReceived || !passwordReceived) {
-          console.log("[auth][authorize] missing credentials -> returning null");
+          console.error("[auth][authorize] missing credentials -> returning null");
           return null;
         }
 
@@ -60,10 +61,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             where: { email: normalizedEmail },
           });
 
-          console.log("[auth][authorize] user found:", !!user);
+          console.error("[auth][authorize] user found:", !!user);
           if (!user) return null;
 
-          console.log("[auth][authorize] passwordHash exists:", !!user.passwordHash);
+          console.error("[auth][authorize] passwordHash exists:", !!user.passwordHash);
           if (!user.passwordHash) return null;
 
           const isValid = await bcrypt.compare(
@@ -71,10 +72,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             user.passwordHash
           );
 
-          console.log("[auth][authorize] bcrypt.compare result:", isValid);
+          console.error("[auth][authorize] bcrypt.compare result:", isValid);
           if (!isValid) return null;
 
-          console.log("[auth][authorize] returning user object: true");
+          console.error("[auth][authorize] returning user object: true");
           return {
             id: user.id,
             email: user.email,
@@ -100,7 +101,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
   callbacks: {
     async jwt({ token, user }) {
-      console.log(
+      console.error(
         "[auth][jwt] invoked. fromAuthorize:",
         !!user?.id,
         "hasTokenSub:",
@@ -146,8 +147,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           }
         } catch (err) {
           console.error(
-            "[auth] jwt org/role enrichment failed:",
-            err instanceof Error ? err.message : String(err)
+            "[auth][jwt] org/role enrichment failed:",
+            err instanceof Error ? `${err.name}: ${err.message}` : String(err)
           );
         }
       }
@@ -160,7 +161,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           session.user.organizationId = token.organizationId as string | null;
           session.user.role = token.role as string;
         }
-        console.log("[auth][session] built session for sub:", !!token.sub);
+        console.error("[auth][session] built session for sub:", !!token.sub);
       } catch (err) {
         console.error(
           "[auth][session] threw:",

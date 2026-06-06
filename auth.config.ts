@@ -6,7 +6,16 @@
 import type { NextAuthConfig } from "next-auth";
 
 export const authConfig = {
-  session: { strategy: "jwt" },
+  // Long-lived JWT session: sign in once, stay signed in for ~1 year.
+  // maxAge   = how long the session/cookie stays valid (365 days).
+  // updateAge = how often the token is refreshed on activity (every 24h).
+  // Because maxAge is set, the cookie is persistent (survives browser restarts),
+  // which gives "remember me" behavior by default without any UI change.
+  session: {
+    strategy: "jwt",
+    maxAge: 60 * 60 * 24 * 365, // 365 days
+    updateAge: 60 * 60 * 24, // 24 hours
+  },
   secret: process.env.AUTH_SECRET,
 
   // Required on Vercel / behind a proxy: Auth.js v5 otherwise rejects requests
