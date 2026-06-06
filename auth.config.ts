@@ -9,6 +9,12 @@ export const authConfig = {
   session: { strategy: "jwt" },
   secret: process.env.AUTH_SECRET,
 
+  // Required on Vercel / behind a proxy: Auth.js v5 otherwise rejects requests
+  // with an "UntrustedHost" error because it cannot verify the request origin,
+  // which breaks sign-in even when the build succeeds. Trusting the host lets
+  // Auth.js infer the deployment URL from request headers when AUTH_URL is unset.
+  trustHost: true,
+
   pages: {
     signIn: "/auth/login",
     error: "/auth/error",
