@@ -16,9 +16,23 @@ import type { ChatCompletionMessageParam } from "openai/resources/chat/completio
 
 // ─── Client setup ──────────────────────────────────────────────────────────────
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazily construct the OpenAI client so that a missing OPENAI_API_KEY does NOT
+// throw at module import time (which would crash the Vercel build when Next.js
+// collects page data). The client is created on first use, inside a request.
+let _openai: OpenAI | null = null;
+
+function getOpenAIClient(): OpenAI {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      "OPENAI_API_KEY is not configured. Set it in the environment before calling the LLM provider."
+    );
+  }
+  if (!_openai) {
+    _openai = new OpenAI({ apiKey });
+  }
+  return _openai;
+}
 
 export const DEFAULT_MODEL = process.env.OPENAI_MODEL ?? "gpt-4o";
 
@@ -64,7 +78,7 @@ export async function generateText(
 
   const startTime = Date.now();
 
-  const response = await openai.chat.completions.create({
+  const response = await getOpenAIClient().chat.completions.create({
     model,
     messages,
     max_tokens: maxTokens,
@@ -143,7 +157,7 @@ export async function generateConversationResponse(
 
   const startTime = Date.now();
 
-  const response = await openai.chat.completions.create({
+  const response = await getOpenAIClient().chat.completions.create({
     model,
     messages: messages as ChatCompletionMessageParam[],
     max_tokens: maxTokens,

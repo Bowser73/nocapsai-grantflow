@@ -6,7 +6,27 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { runWriterAgentAllSections } from "@/lib/agents/writer-agent";
 
+// This route uses Prisma, the OpenAI client, and env-dependent logic at request
+// time. Force dynamic + Node.js runtime so Next.js does not try to evaluate or
+// statically collect page data for it during build.
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 export async function POST(req: NextRequest) {
+  // Validate required env at request time (never throw at import/build time).
+  if (!process.env.DATABASE_URL) {
+    return NextResponse.json(
+      { error: "Server is not configured: DATABASE_URL is missing." },
+      { status: 503 }
+    );
+  }
+  if (!process.env.OPENAI_API_KEY) {
+    return NextResponse.json(
+      { error: "Server is not configured: OPENAI_API_KEY is missing." },
+      { status: 503 }
+    );
+  }
+
   const session = await auth();
   if (!session?.user?.organizationId) {
     return NextResponse.redirect(new URL("/auth/login", req.url));
