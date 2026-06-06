@@ -24,8 +24,10 @@ function LoginForm() {
     setLoading(true);
     setError("");
 
+    // Normalize email to match how it is stored/looked up server-side
+    // (the authorize callback trims + lowercases before the DB lookup).
     const result = await signIn("credentials", {
-      email,
+      email: email.trim().toLowerCase(),
       password,
       redirect: false,
     });

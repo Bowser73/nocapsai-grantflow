@@ -35,22 +35,46 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null;
+        // ── Safe diagnostics ──────────────────────────────────────────────
+        // Logs ONLY booleans + the normalized email. Never logs the raw
+        // password or the password hash. Visible in Vercel function logs.
+        const emailReceived =
+          typeof credentials?.email === "string" && credentials.email.length > 0;
+        const passwordReceived =
+          typeof credentials?.password === "string" && credentials.password.length > 0;
+        const normalizedEmail = emailReceived
+          ? (credentials!.email as string).trim().toLowerCase()
+          : "";
+
+        console.log("[auth][authorize] email received:", emailReceived);
+        console.log("[auth][authorize] normalized email:", normalizedEmail || "(none)");
+        console.log("[auth][authorize] password received:", passwordReceived);
+
+        if (!emailReceived || !passwordReceived) {
+          console.log("[auth][authorize] missing credentials -> returning null");
+          return null;
+        }
 
         try {
           const user = await prisma.user.findUnique({
-            where: { email: credentials.email as string },
+            where: { email: normalizedEmail },
           });
 
-          if (!user || !user.passwordHash) return null;
+          console.log("[auth][authorize] user found:", !!user);
+          if (!user) return null;
+
+          console.log("[auth][authorize] passwordHash exists:", !!user.passwordHash);
+          if (!user.passwordHash) return null;
 
           const isValid = await bcrypt.compare(
-            credentials.password as string,
+            credentials!.password as string,
             user.passwordHash
           );
 
+          console.log("[auth][authorize] bcrypt.compare result:", isValid);
           if (!isValid) return null;
 
+          console.log("[auth][authorize] returning user object: true");
           return {
             id: user.id,
             email: user.email,
@@ -58,13 +82,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             image: user.image,
           };
         } catch (err) {
-          // Surfaces real causes (e.g. DB unreachable or tables not migrated)
-          // in server logs WITHOUT exposing credentials or secrets to the client.
-          // The user still sees a generic "Invalid email or password" message.
+          // Surfaces real causes (e.g. DB unreachable, missing DATABASE_URL,
+          // tables not migrated) in server logs WITHOUT exposing credentials or
+          // secrets. The user still sees a generic "Invalid email or password".
           console.error(
-            "[auth] credentials authorize failed:",
-            err instanceof Error ? err.message : String(err)
+            "[auth][authorize] threw:",
+            err instanceof Error ? `${err.name}: ${err.message}` : String(err)
           );
+          if (err instanceof Error && err.stack) {
+            console.error("[auth][authorize] stack:", err.stack);
+          }
           return null;
         }
       },
@@ -73,6 +100,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
   callbacks: {
     async jwt({ token, user }) {
+      console.log(
+        "[auth][jwt] invoked. fromAuthorize:",
+        !!user?.id,
+        "hasTokenSub:",
+        !!token.sub
+      );
       if (user?.id) {
         token.sub = user.id;
       }
@@ -121,10 +154,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return token;
     },
     async session({ session, token }) {
-      if (token.sub) {
-        session.user.id = token.sub;
-        session.user.organizationId = token.organizationId as string | null;
-        session.user.role = token.role as string;
+      try {
+        if (token.sub) {
+          session.user.id = token.sub;
+          session.user.organizationId = token.organizationId as string | null;
+          session.user.role = token.role as string;
+        }
+        console.log("[auth][session] built session for sub:", !!token.sub);
+      } catch (err) {
+        console.error(
+          "[auth][session] threw:",
+          err instanceof Error ? `${err.name}: ${err.message}` : String(err)
+        );
       }
       return session;
     },
