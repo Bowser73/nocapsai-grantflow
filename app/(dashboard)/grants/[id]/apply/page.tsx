@@ -7,12 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { SectionCard } from "@/components/workspace/section-card";
 import { StatusSelector } from "@/components/workspace/status-selector";
-import { ExportButton } from "@/components/workspace/export-button";
+import { SubmissionActions } from "@/components/workspace/submission-actions";
 import { TimelineCard } from "@/components/workspace/timeline-card";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { GRANT_SECTION_ORDER, GRANT_SECTION_LABELS } from "@/types";
 import {
-  CheckCircle, Circle, Sparkles, ChevronRight, Clock,
+  CheckCircle, Circle, Sparkles, ChevronRight, Clock, AlertTriangle,
 } from "lucide-react";
 
 export const metadata = { title: "Application Workspace" };
@@ -45,6 +45,11 @@ export default async function ApplicationWorkspacePage({
   const totalSections = GRANT_SECTION_ORDER.length;
   const sectionProgress = Math.round((approvedCount / totalSections) * 100);
   const sectionMap = new Map(application.sections.map((s) => [s.sectionType, s]));
+  const officialApplicationUrl =
+    application.portalUrl ?? application.opportunity.applicationUrl ?? application.opportunity.sourceUrl ?? null;
+  const submissionInstructions =
+    application.submissionNotes ??
+    "GrantFlow prepares the application package, but final submission must be completed through the official Grants.gov or funder portal. Export the draft, complete required federal forms, upload attachments, submit through the official portal, then return here and mark the application as submitted.";
 
   return (
     <div>
@@ -57,10 +62,13 @@ export default async function ApplicationWorkspacePage({
               applicationId={application.id}
               currentStatus={application.status}
             />
-            <ExportButton applicationId={application.id} />
-            <Button size="sm" variant="ghost" icon={<Sparkles size={14} />} disabled>
-              Compliance
-            </Button>
+            <SubmissionActions
+              applicationId={application.id}
+              applicationStatus={application.status}
+              officialApplicationUrl={officialApplicationUrl}
+              submissionInstructions={submissionInstructions}
+              defaultSubmittedBy={session.user.name ?? session.user.email ?? ""}
+            />
           </div>
         }
       />
@@ -172,6 +180,14 @@ export default async function ApplicationWorkspacePage({
 
         {/* Center: Writing Area */}
         <div className="col-span-2 space-y-4">
+          {application.status === "READY_TO_SUBMIT" && (
+            <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+              <AlertTriangle size={15} className="text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-sm text-amber-900 leading-relaxed">
+                GrantFlow prepares your application package. Final submission must be completed through the official funder portal. After submitting, save your confirmation number and mark this application as Submitted.
+              </p>
+            </div>
+          )}
           {application.sections.length === 0 && (
             <div className="bg-brand-50 border border-brand-200 rounded-xl p-6 text-center">
               <Sparkles size={28} className="mx-auto text-brand-500 mb-3" />

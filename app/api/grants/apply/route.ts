@@ -43,7 +43,10 @@ export async function POST(req: NextRequest) {
       opportunityId,
       status: "DRAFTING",
       deadline: opportunity.deadline,
+      portalUrl: opportunity.applicationUrl ?? opportunity.sourceUrl ?? null,
       submissionMethod: opportunity.submissionMethod,
+      submissionNotes:
+        "GrantFlow prepares the application package, but final submission must be completed through the official Grants.gov or funder portal. Export the draft, complete required federal forms, upload attachments, submit through the official portal, then return here and mark the application as submitted.",
     },
   });
 

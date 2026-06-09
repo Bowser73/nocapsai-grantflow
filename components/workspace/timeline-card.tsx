@@ -288,11 +288,11 @@ export function TimelineCard(props: TimelineProps) {
           <div className="flex gap-2 pt-1">
             {!isSubmitted ? (
               <button
-                onClick={() => setShowSubmit((v) => !v)}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-brand-600 text-white text-xs font-semibold rounded-lg hover:bg-brand-700 transition-colors"
+                disabled
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-gray-100 text-gray-500 text-xs font-semibold rounded-lg cursor-not-allowed"
               >
                 <CheckCircle2 size={13} />
-                Mark as Submitted
+                Use “Ready to Submit” menu to mark submitted
               </button>
             ) : (
               <button
@@ -314,7 +314,7 @@ export function TimelineCard(props: TimelineProps) {
           </div>
 
           {/* ── Mark as Submitted panel ── */}
-          {showSubmit && (
+          {showSubmit && isSubmitted && (
             <div className="border border-brand-200 rounded-lg p-3 bg-brand-50/40 space-y-3">
               <p className="text-xs font-semibold text-brand-800">Mark as Submitted</p>
 
