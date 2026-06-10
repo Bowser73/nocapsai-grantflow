@@ -15,10 +15,14 @@ import type { ComplianceFlag } from "@/types";
 export interface OrgGuardrails {
   orgName: string;
   isTwiztedJourneys: boolean;
+  /** Drives business vs nonprofit writing guidance in the writer agent */
+  profileKind: "nonprofit" | "business" | "generic";
   approvedFramings: string[];
   forbiddenClaims: string[];
   /** Lowercase terms — each entry is checked via case-insensitive includes */
   forbiddenTermChecks: ForbiddenTermCheck[];
+  /** Optional lines appended after the forbidden-claims block (org-specific safe substitutes) */
+  safeSubstituteLines?: string[];
   placeholderGuidance: string[];
 }
 
@@ -48,6 +52,7 @@ function buildTwiztedGuardrails(orgName: string): OrgGuardrails {
   return {
     orgName,
     isTwiztedJourneys: true,
+    profileKind: "nonprofit",
     approvedFramings: [
       "Community-based nonprofit in Shelbyville, Indiana",
       "Suicide prevention awareness, education, and community outreach",
@@ -108,14 +113,85 @@ function buildTwiztedGuardrails(orgName: string): OrgGuardrails {
   };
 }
 
+// ── NoCapsAI LLC (for-profit small business) — its own guardrail set ─────────────
+// Kept entirely separate from Twizted Journeys; the two are never merged.
+
+export function detectNoCapsAI(orgName: string): boolean {
+  const lower = orgName.toLowerCase();
+  return lower.includes("nocaps");
+}
+
+function buildNoCapsAIGuardrails(orgName: string): OrgGuardrails {
+  return {
+    orgName,
+    isTwiztedJourneys: false,
+    profileKind: "business",
+    approvedFramings: [
+      "Early-stage Indiana technology services company based in Rushville, Indiana",
+      "Practical AI readiness, automation, and workflow tools for small businesses and community organizations",
+      "Website systems, QR systems, and content systems for local organizations",
+      "Administrative automation and grant-workflow support",
+      "Technical service provider, vendor, or implementation partner for nonprofits, schools, and community groups",
+      "Serving Indiana first, then the Midwest and national remote services",
+      "Hands-on, practical AI implementation for local service businesses, contractors, and small teams",
+    ],
+    forbiddenClaims: [
+      "employees, staff headcount, or a team (NoCapsAI is early-stage — do not claim employees unless verified)",
+      "existing customers, a client base, or active users (unless verified)",
+      "revenue, sales, or profitability figures",
+      "certifications, accreditations, or licenses (unless verified)",
+      "SAM.gov registration or active SAM.gov status (unless verified)",
+      "a UEI (Unique Entity Identifier), DUNS number, or CAGE code (unless verified)",
+      "government contracting status, GSA Schedule, or past federal awards",
+      "501(c)(3) or nonprofit status — NoCapsAI is a for-profit LLC",
+      "partnerships, affiliations, or letters of support that are not verified",
+      "grants or awards received, or recognitions (unless verified)",
+    ],
+    forbiddenTermChecks: [
+      { term: "our employees",         severity: "error",   code: "STAFF_CLAIM",        message: '"Our employees" — NoCapsAI is early-stage; do not claim employees unless verified.' },
+      { term: "our team of",           severity: "warning", code: "STAFF_CLAIM",        message: '"Our team of" — verify team size; NoCapsAI has no claimed headcount.' },
+      { term: "our staff",             severity: "warning", code: "STAFF_CLAIM",        message: '"Our staff" — verify staffing before claiming employees.' },
+      { term: "our customers",         severity: "error",   code: "CUSTOMER_CLAIM",     message: '"Our customers" — do not claim an existing customer base unless verified.' },
+      { term: "existing customers",    severity: "error",   code: "CUSTOMER_CLAIM",     message: '"Existing customers" — do not claim a customer base unless verified.' },
+      { term: "our clients",           severity: "warning", code: "CUSTOMER_CLAIM",     message: '"Our clients" — verify client work before citing it.' },
+      { term: "annual revenue",        severity: "error",   code: "REVENUE_CLAIM",      message: '"Annual revenue" — do not state revenue figures unless verified.' },
+      { term: "in revenue",            severity: "warning", code: "REVENUE_CLAIM",      message: '"In revenue" — do not cite revenue unless verified.' },
+      { term: "profitable",            severity: "warning", code: "REVENUE_CLAIM",      message: '"Profitable" — do not claim profitability unless verified.' },
+      { term: "sam.gov",               severity: "warning", code: "REGISTRATION_CLAIM", message: '"SAM.gov" — verify registration status; use [VERIFY: SAM.gov UEI] rather than asserting it.' },
+      { term: "sam registered",        severity: "error",   code: "REGISTRATION_CLAIM", message: '"SAM registered" — do not assert SAM.gov registration unless verified.' },
+      { term: "cage code",             severity: "warning", code: "REGISTRATION_CLAIM", message: '"CAGE code" — verify before claiming.' },
+      { term: "gsa schedule",          severity: "error",   code: "CONTRACTING_CLAIM",  message: '"GSA Schedule" — NoCapsAI does not hold a GSA Schedule unless verified.' },
+      { term: "government contractor", severity: "error",   code: "CONTRACTING_CLAIM",  message: '"Government contractor" — do not claim contracting status unless verified.' },
+      { term: "501(c)(3)",             severity: "error",   code: "STATUS_CLAIM",       message: '"501(c)(3)" — NoCapsAI is a for-profit LLC, not a nonprofit.' },
+      { term: "nonprofit organization", severity: "warning", code: "STATUS_CLAIM",     message: '"Nonprofit organization" — NoCapsAI is a for-profit LLC; do not describe itself as a nonprofit.' },
+    ],
+    safeSubstituteLines: [
+      'SAFE SUBSTITUTE: Describe capacity as "NoCapsAI LLC is an early-stage Indiana technology services company" rather than claiming employees, customers, or revenue.',
+      'SAFE SUBSTITUTE: For registrations, write "[VERIFY: confirm SAM.gov UEI registration status before submission]" rather than asserting NoCapsAI is registered.',
+    ],
+    placeholderGuidance: [
+      "Team / staff: [PLACEHOLDER: confirm whether NoCapsAI has any team members or is solo-operated]",
+      "Registrations (SAM.gov UEI, DUNS, CAGE): [VERIFY: confirm registration status before claiming]",
+      "Customers / past work: [PLACEHOLDER: confirm any client work or pilots before citing]",
+      "Revenue / financials: [PLACEHOLDER: confirm any figures before including]",
+      "Partnerships / letters of support: [PLACEHOLDER: verify before claiming]",
+      "Certifications / awards: [PLACEHOLDER: verify before claiming]",
+    ],
+  };
+}
+
 export function buildOrgGuardrails(orgName: string): OrgGuardrails {
   if (detectTwiztedJourneys(orgName)) {
     return buildTwiztedGuardrails(orgName);
+  }
+  if (detectNoCapsAI(orgName)) {
+    return buildNoCapsAIGuardrails(orgName);
   }
   // Generic (non-Twizted) org — minimal guardrails
   return {
     orgName,
     isTwiztedJourneys: false,
+    profileKind: "generic",
     approvedFramings: [],
     forbiddenClaims: [],
     forbiddenTermChecks: [],
@@ -226,23 +302,64 @@ export function buildGrantSpecificContext(
 // ── Prompt block builders ───────────────────────────────────────────────────────
 
 export function buildOrgGuardrailsPromptBlock(guardrails: OrgGuardrails): string {
-  if (!guardrails.isTwiztedJourneys) return "";
+  // Twizted Journeys — preserved exactly (byte-for-byte) so nonprofit behavior is unchanged.
+  if (guardrails.isTwiztedJourneys) {
+    return [
+      "=== APPROVED ORGANIZATION FRAMINGS (use these) ===",
+      "ONLY describe this organization using these approved approaches:",
+      guardrails.approvedFramings.map((f) => `• ${f}`).join("\n"),
+      "",
+      "=== FORBIDDEN CLAIMS — DO NOT INCLUDE ANY OF THESE ===",
+      "This organization does NOT provide the following. Do not imply or state that it does:",
+      guardrails.forbiddenClaims.map((c) => `• ${c}`).join("\n"),
+      "SAFE SUBSTITUTE: If the project connects participants to clinical services, write:",
+      "  \"Twizted Journeys navigates community members to [type of service] through referral and resource connection.\"",
+      "",
+      "=== PLACEHOLDER RULES ===",
+      "When facts are unknown, use these exact placeholders:",
+      guardrails.placeholderGuidance.map((p) => `• ${p}`).join("\n"),
+    ].join("\n");
+  }
 
-  return [
-    "=== APPROVED ORGANIZATION FRAMINGS (use these) ===",
-    "ONLY describe this organization using these approved approaches:",
-    guardrails.approvedFramings.map((f) => `• ${f}`).join("\n"),
-    "",
-    "=== FORBIDDEN CLAIMS — DO NOT INCLUDE ANY OF THESE ===",
-    "This organization does NOT provide the following. Do not imply or state that it does:",
-    guardrails.forbiddenClaims.map((c) => `• ${c}`).join("\n"),
-    "SAFE SUBSTITUTE: If the project connects participants to clinical services, write:",
-    "  \"Twizted Journeys navigates community members to [type of service] through referral and resource connection.\"",
-    "",
-    "=== PLACEHOLDER RULES ===",
-    "When facts are unknown, use these exact placeholders:",
-    guardrails.placeholderGuidance.map((p) => `• ${p}`).join("\n"),
-  ].join("\n");
+  // Generic renderer for any other org that defines framings or forbidden claims
+  // (e.g. NoCapsAI LLC). Orgs with neither (the default generic profile) emit nothing,
+  // preserving prior behavior for Riverside and other profiles.
+  if (guardrails.approvedFramings.length === 0 && guardrails.forbiddenClaims.length === 0) {
+    return "";
+  }
+
+  const parts: string[] = [];
+
+  if (guardrails.approvedFramings.length > 0) {
+    parts.push(
+      "=== APPROVED ORGANIZATION FRAMINGS (use these) ===",
+      "ONLY describe this organization using these approved approaches:",
+      guardrails.approvedFramings.map((f) => `• ${f}`).join("\n"),
+    );
+  }
+
+  if (guardrails.forbiddenClaims.length > 0) {
+    if (parts.length > 0) parts.push("");
+    parts.push(
+      "=== FORBIDDEN CLAIMS — DO NOT INCLUDE ANY OF THESE ===",
+      "This organization has NOT confirmed the following. Do not imply or state that it does:",
+      guardrails.forbiddenClaims.map((c) => `• ${c}`).join("\n"),
+    );
+    if (guardrails.safeSubstituteLines && guardrails.safeSubstituteLines.length > 0) {
+      parts.push(...guardrails.safeSubstituteLines);
+    }
+  }
+
+  if (guardrails.placeholderGuidance.length > 0) {
+    if (parts.length > 0) parts.push("");
+    parts.push(
+      "=== PLACEHOLDER RULES ===",
+      "When facts are unknown, use these exact placeholders:",
+      guardrails.placeholderGuidance.map((p) => `• ${p}`).join("\n"),
+    );
+  }
+
+  return parts.join("\n");
 }
 
 export function buildGrantSpecificPromptBlock(grantCtx: GrantSpecificContext): string {

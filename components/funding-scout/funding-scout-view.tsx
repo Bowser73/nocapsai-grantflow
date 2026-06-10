@@ -24,6 +24,7 @@ import {
   ChevronUp,
   Loader2,
   PlusCircle,
+  Wallet,
 } from "lucide-react";
 
 interface FundingScoutViewProps {
@@ -145,6 +146,38 @@ export function FundingScoutView({ org }: FundingScoutViewProps) {
             Scout generated for <strong className="text-gray-600">{report.orgName}</strong>{" "}
             at {report.generatedAt.toLocaleTimeString()}
           </p>
+
+          {/* ── Funding Buckets (business profiles) ─────────────────────── */}
+          {report.fundingBuckets && report.fundingBuckets.length > 0 && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Wallet size={17} className="text-brand-600" />
+                  <CardTitle>Funding Buckets</CardTitle>
+                </div>
+                <span className="text-xs text-gray-400 font-normal">
+                  Sort each opportunity into a bucket by size & purpose
+                </span>
+              </CardHeader>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {report.fundingBuckets.map((b) => (
+                  <div
+                    key={b.id}
+                    className="rounded-md border border-gray-100 bg-gray-50 p-3"
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[11px] font-bold text-brand-700 bg-brand-50 rounded-full px-2 py-0.5 shrink-0">
+                        Bucket {b.number}
+                      </span>
+                      <p className="text-sm font-semibold text-gray-900">{b.name}</p>
+                    </div>
+                    <p className="text-xs font-medium text-gray-600">{b.amountRange}</p>
+                    <p className="text-xs text-gray-500 mt-1">{b.purpose}</p>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
 
           {/* ── Priority Search Terms ─────────────────────────────────── */}
           <Card>

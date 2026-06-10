@@ -104,10 +104,82 @@ const SECTION_GUIDES: Record<GrantSectionType, string> = {
     "and authentic connection to affected families, impact of funder's investment, " +
     "sincere confident call to fund. Human and mission-driven — not corporate boilerplate.",
 };
+
+// ── Business / vendor section guides (NoCapsAI and other SMALL_BUSINESS profiles) ──
+// Used when guardrails.profileKind === "business". Nonprofit/generic profiles keep
+// SECTION_GUIDES above unchanged.
+const BUSINESS_SECTION_GUIDES: Record<GrantSectionType, string> = {
+  executive_summary:
+    "EXECUTIVE SUMMARY\n" +
+    "2-paragraph overview: who the company is (an early-stage technology services company), " +
+    "what this grant or contract funds, the amount requested, the practical AI/automation/website " +
+    "outcome delivered, and who benefits (small businesses and community organizations). " +
+    "Do not claim employees, customers, revenue, or registrations that are not verified.",
+
+  statement_of_need:
+    "STATEMENT OF NEED\n" +
+    "Document the problem with data (use [PLACEHOLDER: cite source] if unknown): small businesses, " +
+    "nonprofits, and community organizations that lack practical AI, automation, website, and workflow systems. " +
+    "Explain the cost of inaction and connect to funder priorities (economic development, technology adoption, workforce).",
+
+  organization_background:
+    "ORGANIZATION BACKGROUND\n" +
+    "Describe the company as an early-stage Indiana technology services company building practical AI and " +
+    "automation tools. Focus on capability, approach, and founder expertise. " +
+    "Use [PLACEHOLDER] for any team size, past clients, revenue, registrations, or partnerships — never assert them.",
+
+  project_description:
+    "PROJECT DESCRIPTION\n" +
+    "Concrete scope of work: the specific AI/automation/website/QR/content system to be built or delivered, " +
+    "the methodology, the milestones (Month 1 / Month 3 / Month 6 / Month 12), and the deliverables. " +
+    "Be practical and specific about activities and who performs them.",
+
+  goals_and_objectives:
+    "GOALS AND OBJECTIVES\n" +
+    "2-3 goals with 3-5 SMART objectives each. Format: " +
+    "\"By Month X of the project period, [action] resulting in [measurable outcome].\" " +
+    "NEVER use past calendar years. Use [PLACEHOLDER] for unknown target numbers.",
+
+  target_population:
+    "TARGET POPULATION / CUSTOMERS SERVED\n" +
+    "Who benefits: local service businesses, nonprofits, community organizations, contractors, and small teams. " +
+    "Geographic context: Rushville / Rush County and Indiana first, then the Midwest and national remote services. " +
+    "Use [PLACEHOLDER: verify number served] for counts.",
+
+  community_impact:
+    "ECONOMIC & COMMUNITY IMPACT\n" +
+    "Short-term outputs: systems delivered, processes automated, organizations supported. " +
+    "Long-term outcomes: time saved, stronger local digital capacity, improved productivity, and workforce upskilling. " +
+    "Avoid inflated impact claims; use [PLACEHOLDER] for figures.",
+
+  evaluation_plan:
+    "EVALUATION PLAN\n" +
+    "How success is measured: deliverables completed, adoption/usage metrics, stakeholder feedback, and time saved. " +
+    "Keep it realistic for an early-stage company — no enterprise data systems. " +
+    "Use [PLACEHOLDER] for projected counts.",
+
+  sustainability_plan:
+    "SUSTAINABILITY PLAN\n" +
+    "How the work continues after the grant: productizing the offering, reinvestment, additional funding pursued, " +
+    "and a low-cost, repeatable delivery model. Use [PLACEHOLDER: list other funding sources] if not provided.",
+
+  budget_narrative:
+    "BUDGET NARRATIVE\n" +
+    "Justify each category: contracted/technical services, software and tools, equipment, marketing, and training. " +
+    "NEVER invent dollar amounts — use placeholders for unverified figures. " +
+    "Address match requirements only if a match is confirmed and realistic.",
+
+  closing_statement:
+    "CLOSING STATEMENT\n" +
+    "1-2 paragraph conclusion: the practical value of funding this work for Indiana small businesses and " +
+    "community organizations, the funder's return on investment, and a sincere, confident call to fund. " +
+    "Practical and grounded — no corporate boilerplate and no inflated claims.",
+};
 // ── Prompt builder ──────────────────────────────────────────────────────────────
 
 function buildSectionPrompt(sectionType: GrantSectionType, ctx: WriterContext): string {
   const guardrails = buildOrgGuardrails(ctx.organizationName);
+  const guides = guardrails.profileKind === "business" ? BUSINESS_SECTION_GUIDES : SECTION_GUIDES;
   const grantCtx = buildGrantSpecificContext(ctx.grantTitle, ctx.funder, ctx.organizationName);
   const guardrailsBlock = buildOrgGuardrailsPromptBlock(guardrails);
   const grantSpecificBlock = buildGrantSpecificPromptBlock(grantCtx);
@@ -148,7 +220,7 @@ function buildSectionPrompt(sectionType: GrantSectionType, ctx: WriterContext): 
     "* Produce a strong specific first draft, not filler that needs complete rewriting",
     "",
     "=== WRITE THIS SECTION ===",
-    SECTION_GUIDES[sectionType]
+    guides[sectionType]
   );
 
   return parts.join("\n");
@@ -202,13 +274,16 @@ export async function runWriterAgent(
       strategicAngle:   context?.strategicAngle,
     };
 
+    const guardrails = buildOrgGuardrails(writerContext.organizationName);
     const prompt = buildSectionPrompt(sectionType, writerContext);
 
     const llmResult = await generateText(prompt, {
       maxTokens: 900,
       temperature: 0.65,
       systemPrompt:
-        "You are an expert nonprofit grant writer. " +
+        (guardrails.profileKind === "business"
+          ? "You are an expert grant writer for small businesses and technology vendors. "
+          : "You are an expert nonprofit grant writer. ") +
         "Follow ALL rules in the prompt exactly. " +
         "Respond with ONLY the grant section text — no headers, no commentary, no markdown. " +
         "Produce a strong, specific, grant-ready first draft based strictly on the facts provided.",

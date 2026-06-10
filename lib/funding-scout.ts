@@ -57,6 +57,15 @@ export interface ProjectAngle {
   description: string;
 }
 
+// Dollar-range funding buckets (business profiles only)
+export interface FundingBucket {
+  id: string;
+  number: number;
+  name: string;
+  amountRange: string;
+  purpose: string;
+}
+
 export interface FundingScoutReport {
   orgName: string;
   generatedAt: Date;
@@ -66,6 +75,8 @@ export interface FundingScoutReport {
   projectAngles: ProjectAngle[];
   doNotChase: string[];
   disqualifierWarnings: DisqualifierWarning[];
+  /** Dollar-range funding buckets — populated for business profiles only */
+  fundingBuckets?: FundingBucket[];
 }
 
 // ── Profile Type Detection ────────────────────────────────────────────────────
@@ -237,6 +248,18 @@ const BUSINESS_STATIC_BUCKETS: StaticBucket[] = [
     verificationNeeded: true,
   },
   {
+    id: "local-econ-dev",
+    name: "Rush County / Local Economic Development",
+    category: "A",
+    categoryLabel: "Indiana / Local Business Sources",
+    url: "https://www.in.gov/ocra/",
+    description:
+      "Local county and city economic development offices, chambers of commerce, utilities, banks, and community foundations near Rushville often run small grants, micro-grants, and technical-assistance programs. Indiana OCRA also supports rural community and small-business funding. Start here for closest-to-home money.",
+    fitReason:
+      "Closest-to-home funding for a Rushville-based business — small local awards for software, equipment, websites, training, and marketing (Bucket 1).",
+    verificationNeeded: true,
+  },
+  {
     id: "elevate-ventures",
     name: "Elevate Ventures",
     category: "B",
@@ -282,6 +305,18 @@ const BUSINESS_STATIC_BUCKETS: StaticBucket[] = [
       "The Small Business Innovation Research (SBIR) and Small Business Technology Transfer (STTR) programs provide competitive federal grants to small businesses doing R&D and technology development — including AI.",
     fitReason:
       "Direct match for AI and software companies developing innovative technology. Phase I awards up to $275K, Phase II up to $1.8M.",
+    verificationNeeded: false,
+  },
+  {
+    id: "nsf-seed-fund",
+    name: "NSF SBIR/STTR — America's Seed Fund",
+    category: "E",
+    categoryLabel: "SBA / Federal Small Business",
+    url: "https://seedfund.nsf.gov/",
+    description:
+      "The National Science Foundation's SBIR/STTR program (America's Seed Fund) provides non-dilutive R&D funding for startups and small businesses building innovative technology, including AI and software. Begin with a free Project Pitch.",
+    fitReason:
+      "Strong fit for NoCapsAI's AI/software R&D (Bucket 3). Requires SAM.gov/UEI registration — start early; submit a Project Pitch before a full proposal.",
     verificationNeeded: false,
   },
   {
@@ -368,39 +403,67 @@ const NONPROFIT_DISQUALIFIERS: DisqualifierWarning[] = [
 
 const BUSINESS_DISQUALIFIERS: DisqualifierWarning[] = [
   {
-    type: "Nonprofit-Only Eligibility",
+    type: "501(c)(3)-Only Eligibility",
     description:
-      "Many grants on Grants.gov, foundations, and community funders are restricted to 501(c)(3) nonprofits as the lead applicant.",
+      "Grant requires the lead applicant to be a 501(c)(3) nonprofit. NoCapsAI LLC is a for-profit company.",
     avoidance:
-      "Skip nonprofit-only grants unless partnering with a qualifying nonprofit fiscal sponsor.",
-  },
-  {
-    type: "Academic / University Research",
-    description:
-      "Research grants often require a university or academic institution as the lead or principal investigator.",
-    avoidance:
-      "Skip pure research grants unless partnering with an Indiana university (IU, Purdue, IUPUI) as co-applicant. STTR allows this structure.",
-  },
-  {
-    type: "Hardware / Physical Product",
-    description:
-      "Some tech grants are specifically for hardware, manufacturing, or physical product development.",
-    avoidance:
-      "Skip hardware-focused grants unless NoCapsAI develops a hardware component. Stay focused on software, AI, and automation.",
+      "Skip as a direct applicant; instead pursue it as a paid technology vendor/partner to a qualifying nonprofit (Bucket 4).",
   },
   {
     type: "Government Agency-Only",
     description:
-      "Some economic development and technology grants require a government agency as the lead applicant.",
+      "Restricted to government agencies or units of government (city, county, or state).",
     avoidance:
-      "Skip government-only programs. Look for small business set-aside programs instead.",
+      "Skip as lead. Offer services as a subcontractor/vendor to a government applicant instead.",
   },
   {
-    type: "FDA-Regulated Health Tech",
+    type: "Revenue / Employee / History Threshold",
     description:
-      "Medical device or clinical decision-support grants often require FDA clearance pathway plans.",
+      "Requires minimum revenue, employee headcount, or years in business that NoCapsAI does not yet have.",
     avoidance:
-      "Skip unless NoCapsAI pursues an FDA-regulated health tech product line.",
+      "Skip unless the threshold is clearly met. Do not overstate company size, staffing, or operating history.",
+  },
+  {
+    type: "Loan-Only Funding",
+    description:
+      "Program provides only a loan (debt), not grant funds.",
+    avoidance:
+      "Skip unless the loan is clearly useful, low-risk, and affordable for an early-stage company.",
+  },
+  {
+    type: "Sector-Restricted (Ag / Restaurant / Storefront / Manufacturing)",
+    description:
+      "Limited to agriculture, restaurants, physical storefront buildout, or manufacturing.",
+    avoidance:
+      "Skip unless there is a strong, direct fit for AI, automation, or software services.",
+  },
+  {
+    type: "Matching Funds Required",
+    description:
+      "Requires a cash match the company cannot realistically provide.",
+    avoidance:
+      "Skip unless the match is small, in-kind, or otherwise realistic for an early-stage business.",
+  },
+  {
+    type: "Deadline Too Soon for Registrations",
+    description:
+      "Deadline is too close to complete required registrations (e.g., SAM.gov UEI) in time.",
+    avoidance:
+      "Defer to a future cycle and start SAM.gov/UEI registration now so the next deadline is reachable.",
+  },
+  {
+    type: "Pay-to-Apply / Scam / Low-Odds Contest",
+    description:
+      "Fake grant, pay-to-apply scheme, low-odds contest, or listicle with no official funder source.",
+    avoidance:
+      "Reject. Only pursue opportunities that have an official funder source URL and clear terms.",
+  },
+  {
+    type: "Academic / University Research Lead",
+    description:
+      "Research grants that require a university or principal investigator as the lead applicant.",
+    avoidance:
+      "Skip pure research grants unless partnering with an Indiana university (IU, Purdue) under an STTR structure.",
   },
 ];
 
@@ -443,34 +506,80 @@ const NONPROFIT_PROJECT_ANGLES: ProjectAngle[] = [
 
 const BUSINESS_PROJECT_ANGLES: ProjectAngle[] = [
   {
-    title: "AI-Powered Nonprofit Operations Automation",
+    title: "AI Readiness & Clarity Hub for small businesses",
     description:
-      "Building AI tools that reduce administrative burden for nonprofits — grant writing, reporting, donor management, and program tracking automation.",
+      "A guided assessment and starter toolkit that helps small businesses understand where AI and automation can save time and money.",
   },
   {
-    title: "Workforce Development Through AI Tool Training",
+    title: "Local Business Automation Starter Kit",
     description:
-      "Training Indiana workers and small business owners to use AI automation tools to improve productivity and economic outcomes.",
+      "A practical package of automations (scheduling, intake, follow-up, reporting) tailored to local service businesses.",
   },
   {
-    title: "Rural Indiana Small Business Technology Adoption",
+    title: "Nonprofit Website + QR + Intake Automation System",
     description:
-      "Bringing AI and automation tools to underserved rural Indiana small businesses through accessible software and guided implementation.",
+      "A website refresh paired with QR-based access and automated intake/forms for nonprofits and community organizations.",
   },
   {
-    title: "Nonprofit Technology Capacity Building Platform",
+    title: "GrantFlow AI small-organization grant assistant",
     description:
-      "Software-as-a-Service platform designed to increase operational capacity for resource-constrained nonprofits through intelligent automation.",
+      "Tooling that helps small organizations find, evaluate, and draft grant applications using verified official sources.",
   },
   {
-    title: "AI Grant Writing and Grant Management Tools",
+    title: "Community Tech Support and Digital Operations Toolkit",
     description:
-      "Purpose-built AI tools that help nonprofits and small businesses find, apply for, and manage grant opportunities more effectively.",
+      "Ongoing technical support and digital operations setup for small teams that lack in-house IT.",
   },
   {
-    title: "Small Business AI Automation for Operational Efficiency",
+    title: "AI workflow training for small organizations",
     description:
-      "AI-driven workflow automation reducing time spent on repetitive tasks — customer service, scheduling, reporting, and communications.",
+      "Hands-on training that helps staff and owners adopt AI and automation tools safely and effectively.",
+  },
+  {
+    title: "Website rescue and automation package for nonprofits",
+    description:
+      "Rebuilding or rescuing outdated nonprofit websites and layering in automation for intake and communications.",
+  },
+  {
+    title: "Practical AI adoption for rural Indiana businesses",
+    description:
+      "Accessible, low-cost AI and automation adoption for underserved rural Indiana businesses and organizations.",
+  },
+];
+
+// ── BUSINESS: Funding buckets (dollar-range strategy) ──────────────────────────
+export const BUSINESS_FUNDING_BUCKETS: FundingBucket[] = [
+  {
+    id: "bucket-1-quick-local",
+    number: 1,
+    name: "Quick local money",
+    amountRange: "$500–$10,000",
+    purpose:
+      "Software, equipment, website improvements, training, marketing, business setup, and local growth.",
+  },
+  {
+    id: "bucket-2-technical-assistance",
+    number: 2,
+    name: "Technical assistance",
+    amountRange: "$5,000–$25,000",
+    purpose:
+      "Expert services, technical implementation, automation systems, product development, cybersecurity, compliance, and process improvement.",
+  },
+  {
+    id: "bucket-3-rd",
+    number: 3,
+    name: "Serious R&D grants",
+    amountRange: "$50,000–$300,000+",
+    purpose:
+      "SBIR/STTR, AI product development, prototype, proof of concept, research partner, and commercialization plan.",
+  },
+  {
+    id: "bucket-4-partner-vendor",
+    number: 4,
+    name: "Partner / vendor opportunities",
+    amountRange: "Varies",
+    purpose:
+      "NoCapsAI helps nonprofits, schools, or community groups write and implement grants as a paid technology partner.",
   },
 ];
 
@@ -488,12 +597,14 @@ const NONPROFIT_DO_NOT_CHASE: string[] = [
 // ── BUSINESS: Do Not Chase ────────────────────────────────────────────────────
 
 const BUSINESS_DO_NOT_CHASE: string[] = [
-  "Nonprofit-only grants — NoCapsAI LLC is a for-profit entity, not a 501(c)(3)",
-  "Academic / university research grants — require university lead unless using STTR structure",
-  "Clinical / FDA-regulated health technology grants — without a medical device pathway",
-  "Hardware or physical product manufacturing grants — NoCapsAI is software-only",
-  "Adaptive sports or recreational therapy grants — not aligned with core mission",
-  "Law enforcement / first responder technology grants — highly specialized eligibility requirements",
+  "Applicant must be a 501(c)(3) — NoCapsAI LLC is a for-profit company, not a nonprofit (pursue as a vendor/partner instead)",
+  "Applicant must be a government agency or unit of government",
+  "Requires major existing revenue, employees, or operating history that NoCapsAI does not have",
+  "Loan-only funding — skip unless the loan is clearly useful and low-risk",
+  "Restricted to agriculture, restaurants, storefront buildout, or manufacturing — skip unless there is a strong, direct fit",
+  "Requires matching funds NoCapsAI cannot realistically provide",
+  "Deadline is too close to complete required registrations (e.g., SAM.gov UEI) in time",
+  "Fake grant, pay-to-apply scheme, low-odds contest, or listicle with no official source",
 ];
 
 // ── Keyword Extraction ────────────────────────────────────────────────────────
@@ -757,114 +868,128 @@ function buildBusinessStrategies(
   const { stateLabel } = kw;
   const strategies: SearchStrategy[] = [];
 
-  // A — Indiana local
+  // 1 — Indiana small-business grants
   strategies.push({
-    term: `${stateLabel} small business technology grants`,
+    term: `${stateLabel} small business grants`,
     priority: "high",
-    categoryLabel: "Indiana / Local",
+    categoryLabel: "Indiana / Small Business",
+    suggestedSources: ["Indiana SBDC", "IEDC", "Rush County / Local Economic Development"],
+  });
+
+  // 2 — Indiana technical assistance programs
+  strategies.push({
+    term: `${stateLabel} small business technical assistance program`,
+    priority: "high",
+    categoryLabel: "Indiana / Technical Assistance",
     suggestedSources: ["Indiana SBDC", "IEDC"],
   });
 
+  // 3 — Indiana startup & entrepreneurship programs
   strategies.push({
-    term: `${stateLabel} small business innovation grants`,
+    term: `${stateLabel} startup and entrepreneurship grants`,
     priority: "high",
-    categoryLabel: "Indiana / Local",
-    suggestedSources: ["Indiana SBDC", "IEDC", "Elevate Ventures"],
+    categoryLabel: "Indiana / Startup",
+    suggestedSources: ["Elevate Ventures", "Indiana SBDC", "TechPoint"],
   });
 
-  // B — Indiana tech/AI
-  if (kw.hasAI || kw.hasTech) {
-    strategies.push({
-      term: `${stateLabel} AI automation startup grants`,
-      priority: "high",
-      categoryLabel: "Indiana Tech / AI",
-      suggestedSources: ["Elevate Ventures", "TechPoint", "IEDC"],
-    });
-    strategies.push({
-      term: `${stateLabel} software startup funding`,
-      priority: "high",
-      categoryLabel: "Indiana Tech / AI",
-      suggestedSources: ["Elevate Ventures", "TechPoint"],
-    });
-    strategies.push({
-      term: "Elevate Ventures Indiana tech grant",
-      priority: "high",
-      categoryLabel: "Indiana Tech / AI",
-      suggestedSources: ["Elevate Ventures"],
-    });
-  }
-
-  // B — nonprofit support angle
-  if (kw.hasNonprofitSupport) {
-    strategies.push({
-      term: "technology tools for nonprofits grant",
-      priority: "high",
-      categoryLabel: "Indiana Tech / Nonprofit Support",
-      suggestedSources: ["Elevate Ventures", "CICF", "Lilly Endowment"],
-    });
-    strategies.push({
-      term: "nonprofit technology capacity building Indiana",
-      priority: "medium",
-      categoryLabel: "Indiana Tech / Nonprofit Support",
-      suggestedSources: ["Elevate Ventures", "IEDC"],
-    });
-  }
-
-  // C — regional
+  // 4 — IEDC programs
   strategies.push({
-    term: `${stateLabel} startup ecosystem grants`,
-    priority: "medium",
-    categoryLabel: "Regional Small Business",
-    suggestedSources: ["Indy Chamber", "TechPoint", "Indiana SBDC"],
+    term: "IEDC technology and innovation grant programs",
+    priority: "high",
+    categoryLabel: "Indiana / IEDC",
+    suggestedSources: ["IEDC"],
   });
 
-  // D — workforce
+  // 5 — Indiana SBDC referrals & grant-readiness
+  strategies.push({
+    term: `${stateLabel} SBDC grant readiness assistance`,
+    priority: "medium",
+    categoryLabel: "Indiana / SBDC",
+    suggestedSources: ["Indiana SBDC"],
+  });
+
+  // 6 — SBIR/STTR for AI, automation, edtech, civic/nonprofit tech, productivity, workflow, accessibility
+  strategies.push({
+    term: "SBIR STTR artificial intelligence automation",
+    priority: "high",
+    categoryLabel: "SBIR / STTR",
+    suggestedSources: ["SBA SBIR / STTR Program", "NSF SBIR/STTR — America's Seed Fund"],
+  });
+  strategies.push({
+    term: "SBIR education technology civic technology accessibility",
+    priority: "medium",
+    categoryLabel: "SBIR / STTR",
+    suggestedSources: ["SBA SBIR / STTR Program", "NSF SBIR/STTR — America's Seed Fund"],
+  });
+
+  // 7 — NSF Seed Fund AI & software
+  strategies.push({
+    term: "NSF SBIR Project Pitch AI software",
+    priority: "high",
+    categoryLabel: "NSF Seed Fund",
+    suggestedSources: ["NSF SBIR/STTR — America's Seed Fund"],
+  });
+
+  // 8 — SBA programs (only when truly open to for-profit small businesses)
+  strategies.push({
+    term: "SBA small business programs for-profit eligible",
+    priority: "low",
+    categoryLabel: "SBA / Federal Small Business",
+    suggestedSources: ["SBA — Small Business Administration Programs"],
+  });
+
+  // 9 — Local county/city/chamber/utility/bank/foundation programs
+  strategies.push({
+    term: "Rush County Rushville Indiana small business grant",
+    priority: "medium",
+    categoryLabel: "Local",
+    suggestedSources: ["Rush County / Local Economic Development", "Indiana SBDC"],
+  });
+  strategies.push({
+    term: "Indiana chamber of commerce small business grant",
+    priority: "low",
+    categoryLabel: "Local",
+    suggestedSources: ["Indy Chamber", "Rush County / Local Economic Development"],
+  });
+
+  // 10 — Export, digital growth, workforce, tech adoption, innovation vouchers
+  strategies.push({
+    term: `${stateLabel} technology adoption innovation voucher grant`,
+    priority: "medium",
+    categoryLabel: "Tech Adoption / Innovation",
+    suggestedSources: ["IEDC", "Indiana SBDC"],
+  });
   if (kw.hasWorkforce || kw.hasAI) {
     strategies.push({
-      term: `workforce development AI technology training ${stateLabel}`,
+      term: `${stateLabel} workforce training technology grant`,
       priority: "medium",
       categoryLabel: "Workforce / Training",
-      suggestedSources: ["IEDC", "Indiana SBDC", "Grants.gov"],
+      suggestedSources: ["IEDC", "Indiana SBDC"],
     });
   }
-
-  // E — SBIR/SBA
   strategies.push({
-    term: "SBA SBIR artificial intelligence grants",
-    priority: "medium",
-    categoryLabel: "SBA / Federal Small Business",
-    suggestedSources: ["SBA SBIR / STTR Program"],
+    term: `${stateLabel} small business export digital growth grant`,
+    priority: "low",
+    categoryLabel: "Export / Digital Growth",
+    suggestedSources: ["IEDC", "Indiana SBDC"],
   });
 
-  strategies.push({
-    term: "STTR AI software startup grants",
-    priority: "medium",
-    categoryLabel: "SBA / Federal Small Business",
-    suggestedSources: ["SBA SBIR / STTR Program"],
-  });
-
-  if (kw.hasAI) {
+  // Partner / vendor angle (Bucket 4) — implement grants for nonprofits/schools
+  if (kw.hasNonprofitSupport) {
     strategies.push({
-      term: "NSF SBIR artificial intelligence Phase I",
+      term: "technology vendor partner for nonprofit grant implementation",
       priority: "medium",
-      categoryLabel: "SBA / Federal Small Business",
-      suggestedSources: ["SBA SBIR / STTR Program", "Grants.gov"],
+      categoryLabel: "Partner / Vendor",
+      suggestedSources: ["Indiana SBDC", "IEDC"],
     });
   }
 
-  // F — federal fallback
+  // Federal fallback — use the live Grant Search; for-profit-eligible programs only
   strategies.push({
-    term: "federal small business technology grants",
+    term: "federal small business technology grants for-profit eligible",
     priority: "low",
     categoryLabel: "Federal",
     suggestedSources: ["Grants.gov (Federal Fallback)"],
-  });
-
-  strategies.push({
-    term: "DOE small business innovation research AI",
-    priority: "low",
-    categoryLabel: "Federal",
-    suggestedSources: ["Grants.gov (Federal Fallback)", "SBA SBIR / STTR Program"],
   });
 
   const seen = new Set<string>();
@@ -1001,6 +1126,13 @@ function attachBusinessSearchTerms(
             "Indiana economic development tech grants",
           ];
         break;
+      case "local-econ-dev":
+        terms = [
+          "Rush County Rushville Indiana small business grant",
+          "Indiana community foundation small business grant",
+          "local chamber of commerce small business grant",
+        ];
+        break;
       case "elevate-ventures":
         terms = termsFor(["Elevate"]);
         if (terms.length === 0)
@@ -1031,6 +1163,13 @@ function attachBusinessSearchTerms(
             "STTR AI software startup grants",
             "NSF SBIR Phase I technology",
           ];
+        break;
+      case "nsf-seed-fund":
+        terms = [
+          "NSF SBIR Project Pitch artificial intelligence",
+          "America's Seed Fund AI software",
+          "NSF STTR small business technology",
+        ];
         break;
       case "sba-programs":
         terms = [
@@ -1072,6 +1211,7 @@ export function generateFundingScout(org: OrgProfileSnapshot): FundingScoutRepor
       projectAngles: BUSINESS_PROJECT_ANGLES,
       doNotChase: BUSINESS_DO_NOT_CHASE,
       disqualifierWarnings: BUSINESS_DISQUALIFIERS,
+      fundingBuckets: BUSINESS_FUNDING_BUCKETS,
     };
   }
 

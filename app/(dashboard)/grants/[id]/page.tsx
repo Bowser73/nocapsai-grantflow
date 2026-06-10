@@ -8,8 +8,15 @@ import { Button } from "@/components/ui/button";
 import { formatCurrency, formatDate, formatDeadline, getDeadlineUrgency } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import {
+  evaluateOpportunity,
+  buildReadinessChecklist,
+  type OpportunityEvaluation,
+  type ReadinessChecklist,
+} from "@/lib/opportunity-evaluation";
+import { detectNoCapsAI } from "@/lib/agents/grant-context";
+import {
   ExternalLink, Calendar, DollarSign, MapPin, FileText,
-  CheckCircle, XCircle, AlertCircle, Sparkles, ArrowRight
+  CheckCircle, XCircle, AlertCircle, Sparkles, ArrowRight, Target, ClipboardList
 } from "lucide-react";
 import Link from "next/link";
 
@@ -36,6 +43,68 @@ export default async function GrantDetailPage({
 
   const existingApp = grant.applications[0];
   const urgency = getDeadlineUrgency(grant.deadline);
+
+  // NoCapsAI / small-business fit evaluation (deterministic; no fabrication).
+  // Only shown for business profiles; nonprofit profiles are unaffected.
+  const org = session.user.organizationId
+    ? await prisma.organization.findUnique({
+        where: { id: session.user.organizationId },
+        select: {
+          name: true, orgType: true, missionStatement: true, programsServices: true,
+          targetPopulation: true, geographicArea: true, city: true, state: true,
+          annualBudget: true, profileCompleteness: true, pastGrantsNarrative: true,
+        },
+      })
+    : null;
+
+  const isBusinessOrg =
+    !!org && (detectNoCapsAI(org.name) || org.orgType === "SMALL_BUSINESS");
+
+  const orgSnapshot = org
+    ? {
+        name: org.name,
+        orgType: org.orgType as string,
+        missionStatement: org.missionStatement,
+        programsServices: org.programsServices,
+        targetPopulation: org.targetPopulation,
+        geographicArea: org.geographicArea,
+        city: org.city,
+        state: org.state,
+        annualBudget: org.annualBudget,
+        profileCompleteness: org.profileCompleteness,
+        pastGrantsNarrative: org.pastGrantsNarrative,
+      }
+    : null;
+
+  const evaluation =
+    isBusinessOrg && orgSnapshot
+      ? evaluateOpportunity(
+          {
+            title: grant.title,
+            funder: grant.funder,
+            description: grant.description,
+            category: grant.category,
+            focusAreas: grant.focusAreas,
+            eligibility: grant.eligibility,
+            orgTypesAllowed: grant.orgTypesAllowed as unknown as string[],
+            locationRestriction: grant.locationRestriction,
+            locationStates: grant.locationStates,
+            awardMin: grant.awardMin,
+            awardMax: grant.awardMax,
+            awardTypical: grant.awardTypical,
+            deadline: grant.deadline,
+            isRolling: grant.isRolling,
+            applicationUrl: grant.applicationUrl,
+            sourceUrl: grant.sourceUrl,
+            requiredDocuments: grant.requiredDocuments,
+            submissionMethod: grant.submissionMethod as unknown as string,
+          },
+          orgSnapshot
+        )
+      : null;
+
+  const readiness =
+    isBusinessOrg && orgSnapshot ? buildReadinessChecklist(orgSnapshot) : null;
 
   const deadlineColor = {
     overdue: "text-red-600",
@@ -170,6 +239,11 @@ export default async function GrantDetailPage({
           </Card>
         </div>
 
+        {/* NoCapsAI fit evaluation (business profiles only) */}
+        {evaluation && (
+          <NoCapsAIEvaluationCard evaluation={evaluation} readiness={readiness} />
+        )}
+
         {/* Required documents */}
         {grant.requiredDocuments.length > 0 && (
           <Card>
@@ -218,5 +292,110 @@ function InfoRow({
         <div className="text-sm text-gray-800">{children}</div>
       </div>
     </div>
+  );
+}
+
+function EvalRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <p className="text-xs text-gray-400 mb-0.5">{label}</p>
+      <div className="text-sm text-gray-800">{children}</div>
+    </div>
+  );
+}
+
+function NoCapsAIEvaluationCard({
+  evaluation,
+  readiness,
+}: {
+  evaluation: OpportunityEvaluation;
+  readiness: ReadinessChecklist | null;
+}) {
+  const canApplyMeta: Record<
+    OpportunityEvaluation["canApplyDirectly"],
+    { label: string; className: string }
+  > = {
+    yes:     { label: "Likely yes",  className: "text-green-700 bg-green-50" },
+    likely:  { label: "Possibly",    className: "text-green-700 bg-green-50" },
+    no:      { label: "No (direct)", className: "text-red-700 bg-red-50" },
+    unknown: { label: "Unknown",     className: "text-gray-600 bg-gray-100" },
+  };
+  const ca = canApplyMeta[evaluation.canApplyDirectly];
+
+  return (
+    <Card>
+      <div className="flex items-start justify-between gap-4 mb-4">
+        <div className="flex items-center gap-2">
+          <Target size={17} className="text-brand-600" />
+          <h2 className="text-sm font-semibold text-gray-900">NoCapsAI Fit Evaluation</h2>
+        </div>
+        <div className="shrink-0 text-center bg-brand-50 rounded-lg px-3 py-1.5">
+          <span className="text-lg font-bold text-brand-700">{evaluation.fitScore}</span>
+          <span className="text-xs text-brand-500">/10 fit</span>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        {evaluation.bucket && (
+          <Badge variant="info" size="sm">
+            Bucket {evaluation.bucket.number}: {evaluation.bucket.name}
+          </Badge>
+        )}
+        <Badge variant="neutral" size="sm">Difficulty {evaluation.applicationDifficulty}/5</Badge>
+        <span className={cn("text-[11px] font-semibold rounded-full px-2 py-0.5", ca.className)}>
+          Apply directly: {ca.label}
+        </span>
+        {evaluation.couldBeVendorPartner && (
+          <Badge variant="success" size="sm">Vendor/partner option</Badge>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        <EvalRow label="Why it fits / does not">{evaluation.fitRationale}</EvalRow>
+        <EvalRow label="Award amount">{evaluation.awardAmount ?? "[VERIFY with funder]"}</EvalRow>
+        <EvalRow label="Match requirement">{evaluation.matchRequirement}</EvalRow>
+        <EvalRow label="Recommended angle">{evaluation.recommendedAngle}</EvalRow>
+        <EvalRow label="Required registrations">{evaluation.requiredRegistrations.join(", ")}</EvalRow>
+        <EvalRow label="Required attachments">{evaluation.requiredAttachments.join(", ")}</EvalRow>
+        <EvalRow label="First-draft abstract">
+          <span className="text-gray-600">{evaluation.firstDraftAbstract}</span>
+        </EvalRow>
+        <EvalRow label="Required next action">{evaluation.requiredNextAction}</EvalRow>
+      </div>
+
+      {readiness && (
+        <div className="mt-4 pt-4 border-t border-gray-100">
+          <div className="flex items-center gap-2 mb-2">
+            <ClipboardList size={15} className="text-gray-500" />
+            <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+              Readiness checklist (before drafting)
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            {readiness.items.map((it) => (
+              <div key={it.label} className="flex items-start gap-2">
+                {it.status === "present" ? (
+                  <CheckCircle size={14} className="shrink-0 mt-0.5 text-green-500" />
+                ) : it.status === "missing" ? (
+                  <XCircle size={14} className="shrink-0 mt-0.5 text-red-400" />
+                ) : (
+                  <AlertCircle size={14} className="shrink-0 mt-0.5 text-amber-500" />
+                )}
+                <div>
+                  <p className="text-sm text-gray-800">{it.label}</p>
+                  <p className="text-xs text-gray-500">{it.note}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-md px-3 py-2 mt-4">
+        ⚠ Verify this opportunity is currently open and that a for-profit Indiana LLC is eligible
+        before applying. This evaluation is generated from available data and does not confirm an
+        open grant.
+      </p>
+    </Card>
   );
 }

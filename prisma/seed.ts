@@ -54,15 +54,48 @@ async function main() {
       email: "info@riversiderecovery.org",
       website: "https://riversiderecovery.org",
       profileCompleteness: 78,
+      // createdByUserId keeps Riverside discoverable as a switchable profile even
+      // after the demo user's active org is pointed at NoCapsAI below.
+      createdByUserId: user.id,
       users: { connect: { id: user.id } },
     },
   });
   console.log("✓ Demo organization created:", org.name);
 
-  // Update user with org
+  // ── NoCapsAI LLC — default workspace (small-business grant scouting + writing) ──
+  const nocapsOrg = await prisma.organization.upsert({
+    where: { id: "nocapsai-org-001" },
+    update: {},
+    create: {
+      id: "nocapsai-org-001",
+      name: "NoCapsAI LLC",
+      orgType: OrgType.SMALL_BUSINESS,
+      stateOfIncorporation: "Indiana",
+      missionStatement:
+        "NoCapsAI LLC is an early-stage Indiana technology services company that builds practical AI and automation tools for small businesses and community organizations.",
+      programsServices:
+        "AI readiness, automation, website systems, nonprofit and small-business tech support, grant workflow support, QR systems, content systems, administrative automation, and practical AI implementation for local organizations.",
+      geographicArea:
+        "Rushville, Rush County, Indiana — serving Indiana first, then the Midwest and national remote services.",
+      targetPopulation:
+        "Local service businesses, nonprofits, community organizations, contractors, and small teams that need simple, practical tech systems.",
+      city: "Rushville",
+      state: "IN",
+      zip: "46173",
+      // Intentionally left null (no unverified claims): ein, annualBudget, contact info,
+      // SAM/UEI, certifications, employees, customers, revenue.
+      profileCompleteness: 70,
+      createdByUserId: user.id,
+      users: { connect: { id: user.id } },
+    },
+  });
+  console.log("✓ NoCapsAI organization created:", nocapsOrg.name);
+
+  // Make NoCapsAI the demo login's default/active workspace.
+  // Riverside remains as test data and a switchable profile, but not the default.
   await prisma.user.update({
     where: { id: user.id },
-    data: { organizationId: org.id },
+    data: { organizationId: nocapsOrg.id },
   });
 
   // ── Grant Sources ──────────────────────────────────────────────────────────
