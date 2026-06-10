@@ -63,9 +63,14 @@ async function main() {
   console.log("✓ Demo organization created:", org.name);
 
   // ── NoCapsAI LLC — default workspace (small-business grant scouting + writing) ──
+  const existingNoCapsOrg = await prisma.organization.findFirst({
+    where: { name: { contains: "nocapsai", mode: "insensitive" } },
+    orderBy: [{ profileCompleteness: "desc" }, { updatedAt: "desc" }],
+  });
+
   const nocapsOrg = await prisma.organization.upsert({
-    where: { id: "nocapsai-org-001" },
-    update: {},
+    where: { id: existingNoCapsOrg?.id ?? "nocapsai-org-001" },
+    update: { createdByUserId: user.id },
     create: {
       id: "nocapsai-org-001",
       name: "NoCapsAI LLC",
