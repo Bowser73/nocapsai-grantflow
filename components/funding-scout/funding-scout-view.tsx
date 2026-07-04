@@ -25,6 +25,7 @@ import {
   Loader2,
   PlusCircle,
   Wallet,
+  ListChecks,
 } from "lucide-react";
 
 interface FundingScoutViewProps {
@@ -47,6 +48,16 @@ function buildNewOpportunityUrl(params: {
   categoryLabel: string;
   fitReason:  string;
   searchTerm?: string;
+  eligibilityTag?: string;
+  applicationStatus?: string;
+  applicantOrganization?: string;
+  applicantTypeRequired?: string;
+  nocapsCanApplyDirectly?: string;
+  nocapsCanParticipateAsPartner?: string;
+  partnerClientName?: string;
+  nextAction?: string;
+  riskNotes?: string;
+  eligibilityNotes?: string;
 }): string {
   const qs = new URLSearchParams();
   qs.set("sourceName",    params.sourceName);
@@ -54,7 +65,197 @@ function buildNewOpportunityUrl(params: {
   qs.set("categoryLabel", params.categoryLabel);
   qs.set("fitReason",     params.fitReason);
   if (params.searchTerm) qs.set("searchTerm", params.searchTerm);
+  if (params.eligibilityTag) qs.set("eligibilityTag", params.eligibilityTag);
+  if (params.applicationStatus) qs.set("applicationStatus", params.applicationStatus);
+  if (params.applicantOrganization) qs.set("applicantOrganization", params.applicantOrganization);
+  if (params.applicantTypeRequired) qs.set("applicantTypeRequired", params.applicantTypeRequired);
+  if (params.nocapsCanApplyDirectly) qs.set("nocapsCanApplyDirectly", params.nocapsCanApplyDirectly);
+  if (params.nocapsCanParticipateAsPartner) qs.set("nocapsCanParticipateAsPartner", params.nocapsCanParticipateAsPartner);
+  if (params.partnerClientName) qs.set("partnerClientName", params.partnerClientName);
+  if (params.nextAction) qs.set("nextAction", params.nextAction);
+  if (params.riskNotes) qs.set("riskNotes", params.riskNotes);
+  if (params.eligibilityNotes) qs.set("eligibilityNotes", params.eligibilityNotes);
   return `/opportunities/new?${qs.toString()}`;
+}
+
+type RecommendedMoveLane = "NoCapsAI Direct" | "Partner/Client" | "Watchlist" | "Skip";
+type RecommendedMovePriority = "High" | "Medium" | "Low";
+type RecommendedMoveAction =
+  | "Add to Grant Tracker"
+  | "Mark as Watchlist"
+  | "Assign to Partner/Client"
+  | "Skip";
+
+interface RecommendedMove {
+  title: string;
+  lane: RecommendedMoveLane;
+  why: string;
+  nextAction: string;
+  priority: RecommendedMovePriority;
+  actionLabel: RecommendedMoveAction;
+  sourceIds: string[];
+  applicantTypeRequired?: string;
+  nocapsCanApplyDirectly?: boolean;
+  partnerRole?: boolean;
+  riskNotes?: string;
+}
+
+const LANE_BADGE: Record<RecommendedMoveLane, string> = {
+  "NoCapsAI Direct": "bg-green-100 text-green-700",
+  "Partner/Client": "bg-blue-100 text-blue-700",
+  Watchlist: "bg-gray-100 text-gray-600",
+  Skip: "bg-red-100 text-red-700",
+};
+
+const MOVE_PRIORITY_BADGE: Record<RecommendedMovePriority, string> = {
+  High: "bg-green-100 text-green-700",
+  Medium: "bg-amber-100 text-amber-700",
+  Low: "bg-gray-100 text-gray-500",
+};
+
+function getRecommendedMoves(report: FundingScoutReport): RecommendedMove[] {
+  const businessProfile = !!report.fundingBuckets?.length;
+  if (!businessProfile) {
+    return [
+      {
+        title: "Verify local and Indiana sources first",
+        lane: "Partner/Client",
+        why: "The strongest nonprofit-style opportunities are usually local or state sources, but Scout data is strategic until the source is verified.",
+        nextAction: "Open the top local or Indiana source, confirm open status, deadline, applicant type, and required documents.",
+        priority: "High",
+        actionLabel: "Assign to Partner/Client",
+        sourceIds: ["shelby-county", "indiana-fssa-dmha", "prevention-insights"],
+        applicantTypeRequired: "Eligible nonprofit, public entity, or community partner",
+        nocapsCanApplyDirectly: false,
+        partnerRole: true,
+      },
+      {
+        title: "Move restricted clinical, school, or government leads out of direct work",
+        lane: "Skip",
+        why: "These are frequent disqualifiers unless a qualified applicant owns the application.",
+        nextAction: "Skip direct application; only revive if an eligible applicant asks NoCapsAI to support the work.",
+        priority: "Medium",
+        actionLabel: "Skip",
+        sourceIds: ["grants-gov"],
+        applicantTypeRequired: "Verify source first",
+        nocapsCanApplyDirectly: false,
+        riskNotes: "Verify source first. Do not list NoCapsAI as applicant unless the funder allows for-profit entities.",
+      },
+    ];
+  }
+
+  return [
+    {
+      title: "Start with rural Indiana digital transformation and tech adoption programs",
+      lane: "NoCapsAI Direct",
+      why: "This is the strongest near-term lane for an Indiana for-profit AI/software company: rural small-business automation, websites, workflow tools, and technology adoption.",
+      nextAction: "Verify source first: confirm a current local, OCRA, chamber, utility, bank, or community foundation program is open and explicitly supports for-profit technology adoption.",
+      priority: "High",
+      actionLabel: "Add to Grant Tracker",
+      sourceIds: ["local-digital-transformation", "iedc-incentives"],
+      applicantTypeRequired: "For-profit small business or Indiana technology company",
+      nocapsCanApplyDirectly: true,
+      partnerRole: false,
+    },
+    {
+      title: "Use Indiana SBDC, TechPoint, and Indy Chamber as referral sources",
+      lane: "Watchlist",
+      why: "These organizations are useful for advice, introductions, and program discovery, but they should not be treated as direct grant funders without a verified live program.",
+      nextAction: "Ask for referrals to current grants, pitch competitions, incentives, financing, procurement, or technical-assistance programs before saving an opportunity.",
+      priority: "High",
+      actionLabel: "Mark as Watchlist",
+      sourceIds: ["indiana-sbdc", "techpoint", "indy-chamber"],
+      applicantTypeRequired: "Referral or verified downstream program",
+      nocapsCanApplyDirectly: false,
+      partnerRole: false,
+      riskNotes: "Advisory organization only until a specific active funding, pitch, loan, incentive, or procurement program is verified.",
+    },
+    {
+      title: "Check startup accelerators and pitch competitions",
+      lane: "NoCapsAI Direct",
+      why: "Pitch and accelerator programs can fit software/startup growth better than generic nonprofit foundation grants.",
+      nextAction: "Verify source first, then only advance if GrantFlow is positioned as a software product with a clear startup narrative, traction plan, and use of funds.",
+      priority: "High",
+      actionLabel: "Add to Grant Tracker",
+      sourceIds: ["elevate-ventures"],
+      applicantTypeRequired: "Indiana startup, software company, or tech ecosystem participant",
+      nocapsCanApplyDirectly: true,
+      partnerRole: false,
+      riskNotes: "Do not assume a grant exists; verify whether the active program is a grant, investment, pitch competition, accelerator, or advisory support.",
+    },
+    {
+      title: "Treat SBIR/STTR and NSF Seed Fund as R&D watchlist",
+      lane: "Watchlist",
+      why: "Funding fit can be strong, but application effort and registration burden are high and deadlines should not be assumed from Scout strategy data.",
+      nextAction: "Verify source first; only advance after defining a clear R&D/product development plan, commercialization angle, SAM.gov/UEI readiness, and Project Pitch path.",
+      priority: "Medium",
+      actionLabel: "Mark as Watchlist",
+      sourceIds: ["sba-sbir", "nsf-seed-fund"],
+      applicantTypeRequired: "For-profit small business with R&D/product development plan",
+      nocapsCanApplyDirectly: true,
+      partnerRole: false,
+      riskNotes: "Watchlist unless there is a clear R&D/product development plan. Do not claim an open deadline until verified at the source.",
+    },
+    {
+      title: "Track government contracts and subcontracts separately from grants",
+      lane: "NoCapsAI Direct",
+      why: "Procurement can fund AI automation, software, websites, and workflow services without requiring nonprofit status.",
+      nextAction: "Verify SAM.gov, Indiana procurement, subcontracting, NAICS fit, registration requirements, and open solicitation status.",
+      priority: "High",
+      actionLabel: "Add to Grant Tracker",
+      sourceIds: ["government-contracting"],
+      applicantTypeRequired: "For-profit vendor, small business, subcontractor, or registered supplier",
+      nocapsCanApplyDirectly: true,
+      partnerRole: false,
+      riskNotes: "Treat as contracting, not grant funding. Confirm registrations and procurement rules before pursuing.",
+    },
+    {
+      title: "Move 501(c)(3)-only, government-only, and nonprofit-only opportunities to partner/client lane",
+      lane: "Partner/Client",
+      why: "These may still be useful, but NoCapsAI LLC should support an eligible applicant instead of being listed as lead applicant.",
+      nextAction: "Assign to an eligible nonprofit, public entity, school, or client; position NoCapsAI as grant writer, vendor, contractor, or technical partner.",
+      priority: "High",
+      actionLabel: "Assign to Partner/Client",
+      sourceIds: ["nonprofit-vendor", "grants-gov-biz"],
+      applicantTypeRequired: "501(c)(3), government/public entity, nonprofit, school, or eligible partner",
+      nocapsCanApplyDirectly: false,
+      partnerRole: true,
+      riskNotes: "Do not list NoCapsAI LLC as applicant unless the funder explicitly allows for-profit entities.",
+    },
+  ];
+}
+
+function getMoveUrl(report: FundingScoutReport, move: RecommendedMove): string {
+  const source =
+    report.sourceBuckets.find((bucket) => move.sourceIds.includes(bucket.id)) ??
+    report.sourceBuckets[0];
+  const meta = source ? CATEGORY_META[source.category] : null;
+  const eligibilityTag =
+    move.lane === "NoCapsAI Direct"
+      ? "DIRECT_NOCAPSAI_ELIGIBLE"
+      : move.lane === "Partner/Client"
+      ? "PARTNER_OR_CLIENT_ELIGIBLE"
+      : move.lane === "Skip"
+      ? "NOT_ELIGIBLE"
+      : "WATCHLIST_ONLY";
+
+  return buildNewOpportunityUrl({
+    sourceName: source?.name ?? move.title,
+    sourceUrl: source?.url ?? "https://example.com/verify-source-first",
+    categoryLabel: meta?.label ?? move.lane,
+    fitReason: `${move.why} ${move.nextAction}`,
+    searchTerm: source?.recommendedSearchTerms[0],
+    eligibilityTag,
+    applicationStatus: move.lane === "Watchlist" || move.lane === "Skip" ? "WATCHLIST" : "ELIGIBILITY_REVIEW",
+    applicantOrganization: move.lane === "NoCapsAI Direct" ? report.orgName : "",
+    applicantTypeRequired: move.applicantTypeRequired,
+    nocapsCanApplyDirectly:
+      move.nocapsCanApplyDirectly == null ? undefined : String(move.nocapsCanApplyDirectly),
+    nocapsCanParticipateAsPartner: move.partnerRole ? "true" : undefined,
+    nextAction: move.nextAction,
+    riskNotes: move.riskNotes,
+    eligibilityNotes: "Verify source first. Funding Scout provides strategy guidance, not confirmed open opportunities or deadlines.",
+  });
 }
 
 export function FundingScoutView({ org }: FundingScoutViewProps) {
@@ -148,6 +349,68 @@ export function FundingScoutView({ org }: FundingScoutViewProps) {
           </p>
 
           {/* ── Funding Buckets (business profiles) ─────────────────────── */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <ListChecks size={17} className="text-brand-600" />
+                <CardTitle>Recommended Next Moves</CardTitle>
+              </div>
+              <span className="text-xs text-gray-400 font-normal">
+                Ranked by eligibility, local/state fit, effort, funding fit, and watchlist risk
+              </span>
+            </CardHeader>
+            <div className="space-y-3">
+              {getRecommendedMoves(report).map((move, index) => {
+                const moveUrl = getMoveUrl(report, move);
+                return (
+                  <div
+                    key={move.title}
+                    className="rounded-md border border-gray-100 bg-gray-50 p-3"
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="flex gap-3 min-w-0">
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white border border-gray-200 text-xs font-bold text-gray-700">
+                          {index + 1}
+                        </span>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2 mb-1">
+                            <p className="text-sm font-semibold text-gray-900">
+                              {move.title}
+                            </p>
+                            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${LANE_BADGE[move.lane]}`}>
+                              {move.lane}
+                            </span>
+                            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${MOVE_PRIORITY_BADGE[move.priority]}`}>
+                              {move.priority}
+                            </span>
+                            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-100">
+                              Verify source first
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-600 leading-relaxed">
+                            <span className="font-semibold text-gray-700">Why:</span> {move.why}
+                          </p>
+                          <p className="text-xs text-gray-600 leading-relaxed mt-1">
+                            <span className="font-semibold text-gray-700">Next:</span> {move.nextAction}
+                          </p>
+                        </div>
+                      </div>
+                      <Link href={moveUrl} className="shrink-0">
+                        <Button
+                          size="sm"
+                          variant={move.lane === "Skip" ? "ghost" : "secondary"}
+                          icon={move.actionLabel === "Add to Grant Tracker" ? <PlusCircle size={14} /> : undefined}
+                        >
+                          {move.actionLabel}
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+
           {report.fundingBuckets && report.fundingBuckets.length > 0 && (
             <Card>
               <CardHeader>
@@ -158,6 +421,9 @@ export function FundingScoutView({ org }: FundingScoutViewProps) {
                 <span className="text-xs text-gray-400 font-normal">
                   Sort each opportunity into a bucket by size & purpose
                 </span>
+                <p className="text-xs text-gray-500">
+                  These are planning ranges for sorting opportunities, not guaranteed award limits.
+                </p>
               </CardHeader>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {report.fundingBuckets.map((b) => (
@@ -223,7 +489,7 @@ export function FundingScoutView({ org }: FundingScoutViewProps) {
             <div className="flex items-center gap-2 mb-3">
               <ExternalLink size={16} className="text-brand-600" />
               <h3 className="text-base font-semibold text-gray-900">
-                Ranked Funding Sources
+                Ranked Sources
               </h3>
               <span className="text-xs text-gray-400">(A = highest priority)</span>
             </div>
@@ -252,17 +518,22 @@ export function FundingScoutView({ org }: FundingScoutViewProps) {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-gray-900">{bucket.name}</p>
                         <p className="text-xs text-gray-500">{meta.label}</p>
+                        <div className="mt-1 flex flex-wrap gap-1.5">
+                          <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-600">
+                            {bucket.sourceType}
+                          </span>
+                        </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         {bucket.verificationNeeded ? (
-                          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
                             <AlertTriangle size={10} />
-                            Manual verification needed
+                            {bucket.verificationLabel}
                           </span>
                         ) : (
-                          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5">
                             <CheckCircle2 size={10} />
-                            Live search available
+                            {bucket.verificationLabel}
                           </span>
                         )}
                         {isExpanded
@@ -305,8 +576,9 @@ export function FundingScoutView({ org }: FundingScoutViewProps) {
                             <AlertTriangle size={13} className="shrink-0 mt-0.5 text-amber-500" />
                             <span>
                               <strong>Manual verification needed.</strong> This source cannot be
-                              programmatically searched yet. Visit the source URL, use the recommended
-                              search terms above, and verify eligibility directly before saving.
+                              treated as a confirmed opportunity yet. Visit the source URL, use the
+                              recommended search terms above, and verify open status, applicant type,
+                              funding mechanism, and eligibility before saving.
                             </span>
                           </div>
                         )}
@@ -402,8 +674,7 @@ export function FundingScoutView({ org }: FundingScoutViewProps) {
               </button>
             </CardHeader>
             <p className="text-xs text-gray-500 -mt-2 mb-4">
-              Watch for these requirements when reviewing any grant. These are common
-              disqualifiers for community outreach nonprofits without clinical infrastructure.
+              {report.disqualifierIntro}
             </p>
             <div className="space-y-3">
               {(expandedDisqualifiers

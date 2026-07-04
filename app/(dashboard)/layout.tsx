@@ -1,13 +1,18 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+import { unstable_noStore as noStore } from "next/cache";
 import { getUserOrgs } from "@/lib/user-orgs";
 import { Sidebar } from "@/components/ui/sidebar";
+
+export const dynamic = "force-dynamic";
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  noStore();
+
   const session = await auth();
   if (!session?.user) redirect("/auth/login");
 

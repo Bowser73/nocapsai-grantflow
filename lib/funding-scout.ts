@@ -25,13 +25,34 @@ export interface OrgProfileSnapshot {
 
 // ── Output Types ─────────────────────────────────────────────────────────────
 
-export type SourceCategory = "A" | "B" | "C" | "D" | "E" | "F";
+export type SourceCategory = "A" | "B" | "C" | "D" | "E" | "F" | "G";
+export type FundingSourceType =
+  | "Direct grant or award program"
+  | "Accelerator or pitch competition"
+  | "Loan or financing program"
+  | "Tax credit or economic incentive"
+  | "Technical assistance or advisory organization"
+  | "Procurement or contracting opportunity"
+  | "Local program search lane"
+  | "Economic-development referral source"
+  | "Government small-business program source"
+  | "Federal live-search source";
+export type VerificationLabel =
+  | "Live verified opportunity"
+  | "Live search available"
+  | "Official program source"
+  | "Official search source"
+  | "Advisory or referral source"
+  | "Manual verification required"
+  | "No active opportunity found";
 
 export interface SourceBucket {
   id: string;
   name: string;
   category: SourceCategory;
   categoryLabel: string;
+  sourceType: FundingSourceType;
+  verificationLabel: VerificationLabel;
   url: string;
   description: string;
   recommendedSearchTerms: string[];
@@ -75,6 +96,7 @@ export interface FundingScoutReport {
   projectAngles: ProjectAngle[];
   doNotChase: string[];
   disqualifierWarnings: DisqualifierWarning[];
+  disqualifierIntro: string;
   /** Dollar-range funding buckets — populated for business profiles only */
   fundingBuckets?: FundingBucket[];
 }
@@ -118,7 +140,11 @@ function isBusinessProfile(org: OrgProfileSnapshot): boolean {
 // ── NONPROFIT: Static Source Buckets ─────────────────────────────────────────
 // Priority order: A (local) → B (state MH) → C (regional foundations) → D (corporate) → E (federal)
 
-type StaticBucket = Omit<SourceBucket, "recommendedSearchTerms">;
+type StaticBucket = Omit<
+  SourceBucket,
+  "recommendedSearchTerms" | "sourceType" | "verificationLabel"
+> &
+  Partial<Pick<SourceBucket, "sourceType" | "verificationLabel">>;
 
 const NONPROFIT_STATIC_BUCKETS: StaticBucket[] = [
   {
@@ -126,6 +152,8 @@ const NONPROFIT_STATIC_BUCKETS: StaticBucket[] = [
     name: "Shelby County / Local Community Foundation",
     category: "A",
     categoryLabel: "Indiana / Local Sources",
+    sourceType: "Direct grant or award program",
+    verificationLabel: "Manual verification required",
     url: "https://www.shelbycf.org/",
     description:
       "Shelby County community foundation and local funders. Strong preference for Shelby County-based organizations and initiatives.",
@@ -138,6 +166,8 @@ const NONPROFIT_STATIC_BUCKETS: StaticBucket[] = [
     name: "Indiana FSSA / DMHA",
     category: "A",
     categoryLabel: "Indiana / Local Sources",
+    sourceType: "Direct grant or award program",
+    verificationLabel: "Official program source",
     url: "https://www.in.gov/fssa/dmha/",
     description:
       "Indiana Family and Social Services Administration — Division of Mental Health and Addiction. Funds mental health outreach, prevention, and community programs statewide.",
@@ -150,6 +180,8 @@ const NONPROFIT_STATIC_BUCKETS: StaticBucket[] = [
     name: "Prevention Insights / Indiana Prevention Funding",
     category: "B",
     categoryLabel: "Indiana Mental Health / Prevention",
+    sourceType: "Technical assistance or advisory organization",
+    verificationLabel: "Advisory or referral source",
     url: "https://preventioninsights.iu.edu/",
     description:
       "Indiana University Prevention Insights tracks and aggregates prevention-focused funding across Indiana. Updated grant listings, trainings, and resource connections.",
@@ -162,6 +194,8 @@ const NONPROFIT_STATIC_BUCKETS: StaticBucket[] = [
     name: "Central Indiana Community Foundation / Indianapolis Foundation",
     category: "C",
     categoryLabel: "Regional Community Foundations",
+    sourceType: "Direct grant or award program",
+    verificationLabel: "Manual verification required",
     url: "https://www.cicf.org/",
     description:
       "CICF and The Indianapolis Foundation provide community-focused grants across central Indiana. Mental health and wellness are active grantmaking priorities.",
@@ -174,6 +208,8 @@ const NONPROFIT_STATIC_BUCKETS: StaticBucket[] = [
     name: "United Way of Central Indiana",
     category: "C",
     categoryLabel: "Regional Community Foundations",
+    sourceType: "Direct grant or award program",
+    verificationLabel: "Manual verification required",
     url: "https://www.uwci.org/",
     description:
       "United Way of Central Indiana funds health, education, and financial stability. Mental health is a supported priority area with multiple grant programs.",
@@ -186,6 +222,8 @@ const NONPROFIT_STATIC_BUCKETS: StaticBucket[] = [
     name: "Kicking The Stigma Action Grants",
     category: "D",
     categoryLabel: "Corporate / Private Mental Health Funders",
+    sourceType: "Direct grant or award program",
+    verificationLabel: "Official program source",
     url: "https://www.kickingthestigma.com/",
     description:
       "Indianapolis Colts Kicking The Stigma initiative provides action grants to organizations working to end mental health stigma.",
@@ -198,6 +236,8 @@ const NONPROFIT_STATIC_BUCKETS: StaticBucket[] = [
     name: "Lilly Endowment",
     category: "D",
     categoryLabel: "Corporate / Private Mental Health Funders",
+    sourceType: "Direct grant or award program",
+    verificationLabel: "Official program source",
     url: "https://lillyendowment.org/",
     description:
       "Lilly Endowment funds Indiana community development, youth programs, and well-being initiatives. One of Indiana's largest private funders.",
@@ -210,6 +250,8 @@ const NONPROFIT_STATIC_BUCKETS: StaticBucket[] = [
     name: "Grants.gov (Federal Fallback)",
     category: "E",
     categoryLabel: "Federal Grants.gov Sources",
+    sourceType: "Federal live-search source",
+    verificationLabel: "Live search available",
     url: "https://grants.gov",
     description:
       "Federal grants database. Includes SAMHSA, CDC, and other mental health-adjacent federal funders. Use Grant Search above to query live.",
@@ -273,7 +315,7 @@ const BUSINESS_STATIC_BUCKETS: StaticBucket[] = [
   },
   {
     id: "techpoint",
-    name: "TechPoint Foundation / Orr Fellowship",
+    name: "TechPoint",
     category: "B",
     categoryLabel: "Indiana Tech / AI / Innovation",
     url: "https://techpoint.org/",
@@ -316,7 +358,7 @@ const BUSINESS_STATIC_BUCKETS: StaticBucket[] = [
     description:
       "The National Science Foundation's SBIR/STTR program (America's Seed Fund) provides non-dilutive R&D funding for startups and small businesses building innovative technology, including AI and software. Begin with a free Project Pitch.",
     fitReason:
-      "Strong fit for NoCapsAI's AI/software R&D (Bucket 3). Requires SAM.gov/UEI registration — start early; submit a Project Pitch before a full proposal.",
+      "Strong fit for an AI/software R&D project. Requires SAM.gov/UEI registration — start early; submit a Project Pitch before a full proposal.",
     verificationNeeded: false,
   },
   {
@@ -346,6 +388,177 @@ const BUSINESS_STATIC_BUCKETS: StaticBucket[] = [
 ];
 
 // ── NONPROFIT: Disqualifier Rules ─────────────────────────────────────────────
+
+const BUSINESS_REFINED_BUCKETS: StaticBucket[] = [
+  {
+    id: "local-digital-transformation",
+    name: "Rush County / Rural Indiana Digital Transformation",
+    category: "A",
+    categoryLabel: "Rural Indiana / Digital Transformation",
+    sourceType: "Local program search lane",
+    verificationLabel: "Manual verification required",
+    url: "https://www.in.gov/ocra/",
+    description:
+      "Local, county, OCRA, chamber, utility, bank, and community foundation programs may support rural small-business websites, software, automation, training, and digital operations. Verify a current program before treating any local organization as a funder.",
+    fitReason:
+      "Highest-priority lane for a rural Indiana AI/software company: close geography, practical digital transformation, and lower application burden than federal R&D.",
+    verificationNeeded: true,
+  },
+  {
+    id: "indiana-sbdc",
+    name: "Indiana SBDC - Small Business Development Center",
+    category: "A",
+    categoryLabel: "Technical Assistance / Referrals",
+    sourceType: "Technical assistance or advisory organization",
+    verificationLabel: "Advisory or referral source",
+    url: "https://www.isbdc.org/",
+    description:
+      "Indiana SBDC is an advisory and referral source for consulting, training, grant readiness, financing navigation, and introductions. Do not treat it as a direct grant funder unless a specific current SBDC-run program is verified.",
+    fitReason:
+      "Best first conversation for grant readiness, local referrals, financing options, and validation of Indiana small-business eligibility.",
+    verificationNeeded: true,
+  },
+  {
+    id: "iedc-incentives",
+    name: "IEDC - Indiana Economic Development Corporation",
+    category: "A",
+    categoryLabel: "State Incentives / Innovation",
+    sourceType: "Tax credit or economic incentive",
+    verificationLabel: "Official program source",
+    url: "https://iedc.in.gov/",
+    description:
+      "IEDC is an official source for Indiana economic development programs, incentives, innovation support, and referrals. Confirm whether a current program is an award, tax credit, incentive, loan, or advisory path before saving it as an opportunity.",
+    fitReason:
+      "Relevant for Indiana software, AI, workforce, and innovation positioning, but each program needs eligibility and open-status verification.",
+    verificationNeeded: true,
+  },
+  {
+    id: "elevate-ventures",
+    name: "Elevate Ventures",
+    category: "B",
+    categoryLabel: "Startup Capital / Pitch",
+    sourceType: "Accelerator or pitch competition",
+    verificationLabel: "Official program source",
+    url: "https://www.elevateventures.com/",
+    description:
+      "Elevate Ventures runs Indiana startup capital, pitch, and entrepreneurial support programs. Verify the specific open program, stage fit, geography, and whether the opportunity is grant, investment, competition, or advisory support.",
+    fitReason:
+      "Strong fit when GrantFlow AI is positioned as a software product or AI startup rather than general consulting services.",
+    verificationNeeded: true,
+  },
+  {
+    id: "techpoint",
+    name: "TechPoint",
+    category: "B",
+    categoryLabel: "Tech Ecosystem / Referrals",
+    sourceType: "Technical assistance or advisory organization",
+    verificationLabel: "Advisory or referral source",
+    url: "https://techpoint.org/",
+    description:
+      "TechPoint is an Indiana tech ecosystem organization for visibility, talent, events, startup connections, and referrals. Do not label TechPoint as a direct grant funder unless a specific live award or pitch program is verified.",
+    fitReason:
+      "Useful for ecosystem access, AI/software visibility, pitch referrals, partner discovery, and talent connections.",
+    verificationNeeded: true,
+  },
+  {
+    id: "indy-chamber",
+    name: "Indy Chamber / Regional Small Business Support",
+    category: "C",
+    categoryLabel: "Regional Advisory / Financing",
+    sourceType: "Technical assistance or advisory organization",
+    verificationLabel: "Advisory or referral source",
+    url: "https://www.indychamber.com/",
+    description:
+      "The Indy Chamber and affiliates provide regional small-business support, lending or financing referrals, coaching, and partner connections. Do not treat the chamber itself as a grant funder unless a specific current grant or award program is found.",
+    fitReason:
+      "Useful for central Indiana referrals, technical assistance, lender connections, and business support programs.",
+    verificationNeeded: true,
+  },
+  {
+    id: "government-contracting",
+    name: "Indiana / Federal Government Contracting",
+    category: "G",
+    categoryLabel: "Government Procurement",
+    sourceType: "Procurement or contracting opportunity",
+    verificationLabel: "Official search source",
+    url: "https://www.sam.gov/",
+    description:
+      "Government contracts and subcontracts can fund AI, automation, software, website, data, and workflow services without needing nonprofit eligibility. Verify registrations, set-asides, NAICS fit, procurement rules, and open solicitations.",
+    fitReason:
+      "High-priority non-grant lane for an AI/software company serving agencies, nonprofits, schools, and public-sector contractors.",
+    verificationNeeded: true,
+  },
+  {
+    id: "nonprofit-vendor",
+    name: "Nonprofit Technology Vendor Opportunities",
+    category: "D",
+    categoryLabel: "Partner / Vendor",
+    sourceType: "Procurement or contracting opportunity",
+    verificationLabel: "Manual verification required",
+    url: "https://www.grants.gov/",
+    description:
+      "Nonprofit and public grants can still be relevant when a qualifying applicant budgets the company as a vendor, subcontractor, grant-writing partner, automation provider, or technology implementation partner.",
+    fitReason:
+      "Keeps nonprofit-only grants out of the direct-application lane while preserving legitimate vendor and subcontracting paths.",
+    verificationNeeded: true,
+  },
+  {
+    id: "sba-sbir",
+    name: "SBA SBIR / STTR Program",
+    category: "E",
+    categoryLabel: "SBIR / STTR",
+    sourceType: "Direct grant or award program",
+    verificationLabel: "Official program source",
+    url: "https://www.sbir.gov/",
+    description:
+      "The SBIR/STTR programs provide competitive non-dilutive federal R&D awards to eligible small businesses. This is only a fit when there is real technical research, innovation, commercialization potential, and registration readiness.",
+    fitReason:
+      "Priority R&D lane for AI workflow automation, software prototypes, and commercialization-backed innovation.",
+    verificationNeeded: false,
+  },
+  {
+    id: "nsf-seed-fund",
+    name: "NSF SBIR/STTR - America's Seed Fund",
+    category: "E",
+    categoryLabel: "SBIR / STTR",
+    sourceType: "Direct grant or award program",
+    verificationLabel: "Official program source",
+    url: "https://seedfund.nsf.gov/",
+    description:
+      "NSF America's Seed Fund supports high-risk, high-impact technical innovation by startups and small businesses. Begin with an official Project Pitch and do not assume eligibility without reviewing the solicitation.",
+    fitReason:
+      "Strong only when there is a specific AI/software R&D project, prototype plan, research novelty, and commercialization story.",
+    verificationNeeded: false,
+  },
+  {
+    id: "sba-programs",
+    name: "SBA - Small Business Administration Programs",
+    category: "E",
+    categoryLabel: "SBA / Financing / Certifications",
+    sourceType: "Government small-business program source",
+    verificationLabel: "Official program source",
+    url: "https://www.sba.gov/",
+    description:
+      "SBA programs include loans, certifications, contracting support, and some grant-adjacent programs. Many are not direct grants, so classify the specific program before pursuing.",
+    fitReason:
+      "Useful for financing, contracting readiness, certifications, and small-business support, not as a generic grant source.",
+    verificationNeeded: false,
+  },
+  {
+    id: "grants-gov-biz",
+    name: "Grants.gov (Federal Fallback)",
+    category: "F",
+    categoryLabel: "Federal Grants.gov Sources",
+    sourceType: "Federal live-search source",
+    verificationLabel: "Live search available",
+    url: "https://grants.gov",
+    description:
+      "Federal live-search source. For-profit companies are eligible for a narrower set of grants; use this for SBIR/STTR, technology, workforce, economic-development, procurement-adjacent, and partner/vendor searches.",
+    fitReason:
+      "Use as a live search source, not as proof that a fundable opportunity exists.",
+    verificationNeeded: false,
+  },
+];
 
 const NONPROFIT_DISQUALIFIERS: DisqualifierWarning[] = [
   {
@@ -405,7 +618,7 @@ const BUSINESS_DISQUALIFIERS: DisqualifierWarning[] = [
   {
     type: "501(c)(3)-Only Eligibility",
     description:
-      "Grant requires the lead applicant to be a 501(c)(3) nonprofit. NoCapsAI LLC is a for-profit company.",
+      "Grant requires the lead applicant to be a 501(c)(3) nonprofit. The active business profile is for-profit.",
     avoidance:
       "Skip as a direct applicant; instead pursue it as a paid technology vendor/partner to a qualifying nonprofit (Bucket 4).",
   },
@@ -419,7 +632,7 @@ const BUSINESS_DISQUALIFIERS: DisqualifierWarning[] = [
   {
     type: "Revenue / Employee / History Threshold",
     description:
-      "Requires minimum revenue, employee headcount, or years in business that NoCapsAI does not yet have.",
+      "Requires minimum revenue, employee headcount, or years in business that the company cannot document.",
     avoidance:
       "Skip unless the threshold is clearly met. Do not overstate company size, staffing, or operating history.",
   },
@@ -579,7 +792,7 @@ export const BUSINESS_FUNDING_BUCKETS: FundingBucket[] = [
     name: "Partner / vendor opportunities",
     amountRange: "Varies",
     purpose:
-      "NoCapsAI helps nonprofits, schools, or community groups write and implement grants as a paid technology partner.",
+      "The business helps nonprofits, schools, or community groups write and implement grants as a paid technology partner.",
   },
 ];
 
@@ -597,15 +810,92 @@ const NONPROFIT_DO_NOT_CHASE: string[] = [
 // ── BUSINESS: Do Not Chase ────────────────────────────────────────────────────
 
 const BUSINESS_DO_NOT_CHASE: string[] = [
-  "Applicant must be a 501(c)(3) — NoCapsAI LLC is a for-profit company, not a nonprofit (pursue as a vendor/partner instead)",
+  "Applicant must be a 501(c)(3) — a for-profit business should pursue as a vendor/partner instead",
   "Applicant must be a government agency or unit of government",
-  "Requires major existing revenue, employees, or operating history that NoCapsAI does not have",
+  "Requires major existing revenue, employees, or operating history the company cannot document",
   "Loan-only funding — skip unless the loan is clearly useful and low-risk",
   "Restricted to agriculture, restaurants, storefront buildout, or manufacturing — skip unless there is a strong, direct fit",
-  "Requires matching funds NoCapsAI cannot realistically provide",
+  "Requires matching funds the company cannot realistically provide",
   "Deadline is too close to complete required registrations (e.g., SAM.gov UEI) in time",
   "Fake grant, pay-to-apply scheme, low-odds contest, or listicle with no official source",
 ];
+
+function buildBusinessDisqualifiers(org: OrgProfileSnapshot): DisqualifierWarning[] {
+  const orgName = org.name || "This company";
+  return [
+    {
+      type: "501(c)(3)-Only Eligibility",
+      description:
+        `Grant requires the lead applicant to be a 501(c)(3) nonprofit. ${orgName} is being evaluated as a for-profit company.`,
+      avoidance:
+        "Skip as a direct applicant; instead pursue it as a paid technology vendor, subcontractor, or implementation partner to a qualifying nonprofit.",
+    },
+    {
+      type: "Government Agency-Only",
+      description:
+        "Restricted to government agencies or units of government (city, county, state, public school, or other public entity).",
+      avoidance:
+        "Skip as lead. Offer services as a subcontractor, vendor, or technology partner to an eligible applicant instead.",
+    },
+    {
+      type: "Academic / University Research Lead",
+      description:
+        "Research grants that require a university, research institution, principal investigator, or established lab as the lead applicant.",
+      avoidance:
+        "Skip unless there is a real university or research partner and the opportunity allows a small-business role, such as STTR.",
+    },
+    {
+      type: "Clinical or FDA-Regulated Health",
+      description:
+        "Clinical care, medical device, FDA-regulated, hospital, or treatment-delivery programs outside the company's verified capabilities.",
+      avoidance:
+        "Skip unless the company has a qualified clinical, regulatory, or healthcare partner and a clearly eligible non-clinical role.",
+    },
+    {
+      type: "Manufacturing / Hardware-Only",
+      description:
+        "Limited to manufacturing, equipment production, hardware facilities, storefront buildout, agriculture, or restaurant operations.",
+      avoidance:
+        "Skip unless the program explicitly supports software, AI, automation, digital operations, or technology services.",
+    },
+    {
+      type: "Revenue / Employee / History Threshold",
+      description:
+        "Requires minimum revenue, employee headcount, years in business, audited financials, or customer traction the company cannot document.",
+      avoidance:
+        "Skip unless the threshold is clearly met. Do not overstate company size, staffing, customers, or operating history.",
+    },
+    {
+      type: "Matching Funds Required",
+      description:
+        "Requires cash match, reimbursement capacity, or documented cost share the company cannot currently prove.",
+      avoidance:
+        "Skip unless the match is small, in-kind, committed by a partner, or otherwise realistic and documentable.",
+    },
+    {
+      type: "Expired / Archived / Unverified",
+      description:
+        "Expired program, archived listing, generic listicle, pay-to-apply scheme, or organization page with no current opportunity.",
+      avoidance:
+        "Reject until an official current source URL confirms open status, applicant eligibility, deadline, and funding terms.",
+    },
+  ];
+}
+
+function buildBusinessDoNotChase(org: OrgProfileSnapshot): string[] {
+  const orgName = org.name || "the company";
+  return [
+    `Nonprofit-only grants without an eligible partner - ${orgName} should not apply directly as a for-profit company`,
+    "Academic-only research grants without a university or research partner",
+    "Clinical or FDA-regulated health grants",
+    "Hardware or manufacturing-only programs without a clear software, AI, or automation fit",
+    "Programs requiring an established research laboratory",
+    "Grants restricted to government agencies or school districts",
+    "Opportunities requiring matching funds the company cannot document",
+    "Expired or archived programs",
+    "Advisory organizations with no verified live funding program",
+  ];
+}
 
 // ── Keyword Extraction ────────────────────────────────────────────────────────
 
@@ -718,7 +1008,6 @@ function buildNonprofitStrategies(
 ): SearchStrategy[] {
   const { stateLabel, countyLabel, cityLabel } = kw;
   const strategies: SearchStrategy[] = [];
-
   if (countyLabel) {
     strategies.push({
       term: `${countyLabel} ${stateLabel} nonprofit grants`,
@@ -992,6 +1281,69 @@ function buildBusinessStrategies(
     suggestedSources: ["Grants.gov (Federal Fallback)"],
   });
 
+  strategies.unshift(
+    {
+      term: "Indiana rural small business digital transformation funding",
+      priority: "high",
+      categoryLabel: "Rural Digital Transformation",
+      suggestedSources: ["Rush County / Rural Indiana Digital Transformation", "Indiana SBDC", "IEDC"],
+    },
+    {
+      term: "small business technology adoption program Indiana",
+      priority: "high",
+      categoryLabel: "Technology Adoption",
+      suggestedSources: ["Rush County / Rural Indiana Digital Transformation", "IEDC", "Indiana SBDC"],
+    },
+    {
+      term: "rural business automation funding",
+      priority: "high",
+      categoryLabel: "Rural Automation",
+      suggestedSources: ["Rush County / Rural Indiana Digital Transformation", "Indiana SBDC"],
+    },
+    {
+      term: "Indiana AI startup accelerator",
+      priority: "high",
+      categoryLabel: "Startup / Accelerator",
+      suggestedSources: ["Elevate Ventures", "TechPoint"],
+    },
+    {
+      term: "Indiana technology pitch competition",
+      priority: "high",
+      categoryLabel: "Startup / Pitch",
+      suggestedSources: ["Elevate Ventures", "TechPoint"],
+    },
+    {
+      term: "AI workforce development grant Indiana",
+      priority: "high",
+      categoryLabel: "Workforce / Training",
+      suggestedSources: ["IEDC", "Indiana SBDC", "Grants.gov (Federal Fallback)"],
+    },
+    {
+      term: "SBIR artificial intelligence workflow automation",
+      priority: "high",
+      categoryLabel: "SBIR / STTR",
+      suggestedSources: ["SBA SBIR / STTR Program", "NSF SBIR/STTR - America's Seed Fund"],
+    },
+    {
+      term: "government AI automation small business contract",
+      priority: "high",
+      categoryLabel: "Procurement / Contracting",
+      suggestedSources: ["Indiana / Federal Government Contracting"],
+    },
+    {
+      term: "nonprofit technology vendor opportunity",
+      priority: "high",
+      categoryLabel: "Partner / Vendor",
+      suggestedSources: ["Nonprofit Technology Vendor Opportunities", "Grants.gov (Federal Fallback)"],
+    },
+    {
+      term: "Indiana software startup incentive",
+      priority: "high",
+      categoryLabel: "Innovation Incentives",
+      suggestedSources: ["IEDC", "Elevate Ventures"],
+    }
+  );
+
   const seen = new Set<string>();
   return strategies.filter((s) => {
     if (seen.has(s.term)) return false;
@@ -1084,7 +1436,12 @@ function attachNonprofitSearchTerms(
         terms = ["mental health community outreach"];
     }
 
-    return { ...bucket, recommendedSearchTerms: terms };
+    return {
+      ...bucket,
+      sourceType: bucket.sourceType ?? "Direct grant or award program",
+      verificationLabel: bucket.verificationLabel ?? "Manual verification required",
+      recommendedSearchTerms: terms,
+    };
   });
 }
 
@@ -1106,7 +1463,7 @@ function attachBusinessSearchTerms(
       .map((s) => s.term)
       .slice(0, 3);
 
-  return BUSINESS_STATIC_BUCKETS.map((bucket): SourceBucket => {
+  return BUSINESS_REFINED_BUCKETS.map((bucket): SourceBucket => {
     let terms: string[] = [];
 
     switch (bucket.id) {
@@ -1126,12 +1483,21 @@ function attachBusinessSearchTerms(
             "Indiana economic development tech grants",
           ];
         break;
-      case "local-econ-dev":
+      case "local-digital-transformation":
         terms = [
-          "Rush County Rushville Indiana small business grant",
-          "Indiana community foundation small business grant",
-          "local chamber of commerce small business grant",
+          "Indiana rural small business digital transformation funding",
+          "small business technology adoption program Indiana",
+          "rural business automation funding",
         ];
+        break;
+      case "iedc-incentives":
+        terms = termsFor(["IEDC"]);
+        if (terms.length === 0)
+          terms = [
+            "Indiana software startup incentive",
+            "IEDC technology and innovation programs",
+            "Indiana innovation incentive software startup",
+          ];
         break;
       case "elevate-ventures":
         terms = termsFor(["Elevate"]);
@@ -1145,23 +1511,46 @@ function attachBusinessSearchTerms(
         terms = termsFor(["TechPoint"]);
         if (terms.length === 0)
           terms = [
-            "Indiana tech startup ecosystem grants",
-            "Indiana software company funding",
+            "Indiana AI startup accelerator",
+            "Indiana technology pitch competition",
+            "Indiana software startup ecosystem",
           ];
+        break;
+      case "orr-fellowship":
+        terms = [
+          "Indiana software startup talent program",
+          "Indiana technology fellowship startup employer",
+          "Orr Fellowship startup employer Indiana",
+        ];
         break;
       case "indy-chamber":
         terms = [
-          "Indiana startup ecosystem grants",
-          "central Indiana small business grants",
+          "central Indiana small business support",
+          "Indianapolis small business financing program",
+          "Indiana small business technical assistance",
+        ];
+        break;
+      case "government-contracting":
+        terms = [
+          "government AI automation small business contract",
+          "Indiana software automation procurement",
+          "SAM.gov AI workflow automation small business",
+        ];
+        break;
+      case "nonprofit-vendor":
+        terms = [
+          "nonprofit technology vendor opportunity",
+          "nonprofit grant technology implementation partner",
+          "grant budget software automation vendor",
         ];
         break;
       case "sba-sbir":
         terms = termsFor(["SBIR", "STTR"]);
         if (terms.length === 0)
           terms = [
-            "SBA SBIR artificial intelligence grants",
+            "SBIR artificial intelligence workflow automation",
             "STTR AI software startup grants",
-            "NSF SBIR Phase I technology",
+            "NSF SBIR Phase I AI automation",
           ];
         break;
       case "nsf-seed-fund":
@@ -1183,13 +1572,22 @@ function attachBusinessSearchTerms(
           .map((s) => s.term)
           .slice(0, 3);
         if (terms.length === 0)
-          terms = ["federal small business technology grants"];
+          terms = [
+            "federal small business technology grants for-profit eligible",
+            "AI workforce development grant Indiana",
+            "government AI automation small business contract",
+          ];
         break;
       default:
         terms = ["small business technology grants"];
     }
 
-    return { ...bucket, recommendedSearchTerms: terms };
+    return {
+      ...bucket,
+      sourceType: bucket.sourceType ?? "Technical assistance or advisory organization",
+      verificationLabel: bucket.verificationLabel ?? "Manual verification required",
+      recommendedSearchTerms: terms,
+    };
   });
 }
 
@@ -1209,8 +1607,10 @@ export function generateFundingScout(org: OrgProfileSnapshot): FundingScoutRepor
       searchStrategies: strategies,
       sourceBuckets,
       projectAngles: BUSINESS_PROJECT_ANGLES,
-      doNotChase: BUSINESS_DO_NOT_CHASE,
-      disqualifierWarnings: BUSINESS_DISQUALIFIERS,
+      doNotChase: buildBusinessDoNotChase(org),
+      disqualifierWarnings: buildBusinessDisqualifiers(org),
+      disqualifierIntro:
+        "Watch for these requirements when reviewing funding opportunities. These are common disqualifiers for a for-profit AI and software company without nonprofit, university, clinical, or manufacturing eligibility.",
       fundingBuckets: BUSINESS_FUNDING_BUCKETS,
     };
   }
@@ -1228,6 +1628,8 @@ export function generateFundingScout(org: OrgProfileSnapshot): FundingScoutRepor
     projectAngles: NONPROFIT_PROJECT_ANGLES,
     doNotChase: NONPROFIT_DO_NOT_CHASE,
     disqualifierWarnings: NONPROFIT_DISQUALIFIERS,
+    disqualifierIntro:
+      "Watch for these requirements when reviewing any grant. These are common disqualifiers for community outreach nonprofits without clinical infrastructure.",
   };
 }
 
@@ -1266,5 +1668,10 @@ export const CATEGORY_META: Record<
     label: "F — Federal Grants.gov (Fallback)",
     colorClass: "text-gray-600",
     badgeClass: "bg-gray-100 text-gray-600",
+  },
+  G: {
+    label: "G - Government procurement",
+    colorClass: "text-sky-700",
+    badgeClass: "bg-sky-100 text-sky-700",
   },
 };
