@@ -8,6 +8,12 @@ import { Button } from "@/components/ui/button";
 import { formatCurrency, formatDate, formatDeadline, getDeadlineUrgency } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import {
+  FOR_PROFIT_APPLICANT_WARNING,
+  GRANT_ELIGIBILITY_LABELS,
+  GRANT_STAGE_LABELS,
+  shouldWarnForProfitApplicant,
+} from "@/lib/grant-workflows";
+import {
   evaluateOpportunity,
   buildReadinessChecklist,
   type OpportunityEvaluation,
@@ -43,6 +49,7 @@ export default async function GrantDetailPage({
 
   const existingApp = grant.applications[0];
   const urgency = getDeadlineUrgency(grant.deadline);
+  const warnForProfitApplicant = shouldWarnForProfitApplicant(grant);
 
   // NoCapsAI / small-business fit evaluation (deterministic; no fabrication).
   // Only shown for business profiles; nonprofit profiles are unaffected.
@@ -239,6 +246,59 @@ export default async function GrantDetailPage({
           </Card>
         </div>
 
+        <Card>
+          <h2 className="text-sm font-semibold text-gray-900 mb-4">Grant Workflow Tracking</h2>
+          {warnForProfitApplicant && (
+            <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-4">
+              <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-sm text-amber-900">{FOR_PROFIT_APPLICANT_WARNING}</p>
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+            <EvalRow label="Eligibility tag">
+              {GRANT_ELIGIBILITY_LABELS[grant.eligibilityTag]}
+            </EvalRow>
+            <EvalRow label="Grant-writing stage">
+              {GRANT_STAGE_LABELS[grant.applicationStatus]}
+            </EvalRow>
+            <EvalRow label="Applicant organization">
+              {grant.applicantOrganization || "Not assigned"}
+            </EvalRow>
+            <EvalRow label="Required applicant type">
+              {grant.applicantTypeRequired || "Not specified"}
+            </EvalRow>
+            <EvalRow label="NoCapsAI can apply directly">
+              {grant.nocapsCanApplyDirectly == null ? "Unknown" : grant.nocapsCanApplyDirectly ? "Yes" : "No"}
+            </EvalRow>
+            <EvalRow label="NoCapsAI partner/vendor role">
+              {grant.nocapsCanParticipateAsPartner ? "Yes" : "No / unknown"}
+            </EvalRow>
+            <EvalRow label="Partner/client">
+              {grant.partnerClientName || "Not assigned"}
+            </EvalRow>
+            <EvalRow label="Funding amount">
+              {grant.fundingAmount || (grant.awardMax ? formatCurrency(grant.awardMax) : "Not specified")}
+            </EvalRow>
+            <EvalRow label="Match requirement">
+              {grant.matchRequirement || "Not specified"}
+            </EvalRow>
+            <EvalRow label="SAM.gov / UEI requirement">
+              {grant.samUeiRequirement || "Not specified"}
+            </EvalRow>
+            <EvalRow label="Next action">
+              {grant.nextAction || "Not set"}
+            </EvalRow>
+            <EvalRow label="Eligibility notes">
+              {grant.eligibilityNotes || "None"}
+            </EvalRow>
+          </div>
+          {grant.riskNotes && (
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <EvalRow label="Risk notes">{grant.riskNotes}</EvalRow>
+            </div>
+          )}
+        </Card>
+
         {/* NoCapsAI fit evaluation (business profiles only) */}
         {evaluation && (
           <NoCapsAIEvaluationCard evaluation={evaluation} readiness={readiness} />
@@ -318,7 +378,10 @@ function NoCapsAIEvaluationCard({
     yes:     { label: "Likely yes",  className: "text-green-700 bg-green-50" },
     likely:  { label: "Possibly",    className: "text-green-700 bg-green-50" },
     no:      { label: "No (direct)", className: "text-red-700 bg-red-50" },
-    unknown: { label: "Unknown",     className: "text-gray-600 bg-gray-100" },
+    unknown: {
+      label: "Do not start application until eligibility is verified",
+      className: "text-amber-700 bg-amber-50",
+    },
   };
   const ca = canApplyMeta[evaluation.canApplyDirectly];
 
@@ -329,11 +392,31 @@ function NoCapsAIEvaluationCard({
           <Target size={17} className="text-brand-600" />
           <h2 className="text-sm font-semibold text-gray-900">NoCapsAI Fit Evaluation</h2>
         </div>
-        <div className="shrink-0 text-center bg-brand-50 rounded-lg px-3 py-1.5">
-          <span className="text-lg font-bold text-brand-700">{evaluation.fitScore}</span>
-          <span className="text-xs text-brand-500">/10 fit</span>
+        <div className="shrink-0 text-center bg-brand-50 rounded-lg px-3 py-1.5 max-w-44">
+          {evaluation.fitScore == null ? (
+            <span className="block text-xs font-semibold text-brand-700 leading-snug">
+              Insufficient information to score confidently
+            </span>
+          ) : (
+            <>
+              <span className="text-lg font-bold text-brand-700">{evaluation.fitScore}</span>
+              <span className="text-xs text-brand-500">/10 fit</span>
+              {evaluation.scoreConfidence !== "normal" && (
+                <span className="block text-[10px] font-medium text-brand-600">Provisional</span>
+              )}
+            </>
+          )}
         </div>
       </div>
+
+      {evaluation.scoreNotice && (
+        <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-md px-3 py-2 mb-4">
+          {evaluation.scoreNotice}
+          {evaluation.informationGaps.length > 0
+            ? `: missing ${evaluation.informationGaps.join(", ")}.`
+            : "."}
+        </p>
+      )}
 
       <div className="flex flex-wrap items-center gap-2 mb-4">
         {evaluation.bucket && (
@@ -358,7 +441,9 @@ function NoCapsAIEvaluationCard({
         <EvalRow label="Required registrations">{evaluation.requiredRegistrations.join(", ")}</EvalRow>
         <EvalRow label="Required attachments">{evaluation.requiredAttachments.join(", ")}</EvalRow>
         <EvalRow label="First-draft abstract">
-          <span className="text-gray-600">{evaluation.firstDraftAbstract}</span>
+          <span className="text-gray-600">
+            {evaluation.firstDraftAbstract ?? evaluation.abstractUnavailableReason}
+          </span>
         </EvalRow>
         <EvalRow label="Required next action">{evaluation.requiredNextAction}</EvalRow>
       </div>

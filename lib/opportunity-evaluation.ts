@@ -46,6 +46,8 @@ export interface OpportunityInput {
 
 export type CanApplyDirectly = "yes" | "likely" | "no" | "unknown";
 export type ApplicationDifficulty = 1 | 2 | 3 | 4 | 5;
+export type ScoreConfidence = "normal" | "provisional" | "insufficient";
+export type ScopeDistance = "near" | "unclear" | "distant";
 
 /** The structured fields NoCapsAI requested for every opportunity. */
 export interface OpportunityEvaluation {
@@ -61,10 +63,15 @@ export interface OpportunityEvaluation {
   requiredRegistrations: string[];
   requiredAttachments: string[];
   applicationDifficulty: ApplicationDifficulty;
-  fitScore: number; // 1–10
+  fitScore: number | null; // 1-10, or null when only skeletal title/deadline data is present
+  scoreConfidence: ScoreConfidence;
+  scoreNotice: string | null;
+  informationGaps: string[];
+  scopeDistance: ScopeDistance;
   fitRationale: string;
   recommendedAngle: string;
-  firstDraftAbstract: string;
+  firstDraftAbstract: string | null;
+  abstractUnavailableReason: string | null;
   requiredNextAction: string;
   bucket: FundingBucket | null;
   /** Always true: the system never confirms an opportunity is open without live verification. */
@@ -85,6 +92,66 @@ function combinedText(opp: OpportunityInput): string {
   ]
     .join(" ")
     .toLowerCase();
+}
+
+function hasSubstantialText(value?: string | null, minWords = 12): boolean {
+  if (!value) return false;
+  const text = value.trim().toLowerCase();
+  if (!text) return false;
+  if (
+    /^(unknown|n\/a|na|none|tbd|to be determined|not available|unavailable|description unavailable)$/i.test(
+      text
+    )
+  ) {
+    return false;
+  }
+  return text.split(/\s+/).filter(Boolean).length >= minWords;
+}
+
+function hasFundingAgency(opp: OpportunityInput): boolean {
+  const funder = (opp.funder ?? "").trim().toLowerCase();
+  if (!funder) return false;
+  return !/^(unknown|n\/a|na|federal agency|agency|government agency|various|grants\.gov)$/i.test(
+    funder
+  );
+}
+
+function hasKnownEligibility(opp: OpportunityInput): boolean {
+  return (
+    hasSubstantialText(opp.eligibility, 4) ||
+    ((opp.orgTypesAllowed?.filter(Boolean).length ?? 0) > 0)
+  );
+}
+
+function hasKnownStatus(opp: OpportunityInput): boolean {
+  return Boolean(opp.deadline || opp.isRolling === true);
+}
+
+function hasOfficialScope(opp: OpportunityInput): boolean {
+  const focusTerms = (opp.focusAreas ?? []).filter((area) => area.trim().length > 2).length;
+  return hasSubstantialText(opp.description, 18) || focusTerms >= 2;
+}
+
+function onlyTitleAndDeadlineKnown(opp: OpportunityInput): boolean {
+  return (
+    Boolean(opp.title?.trim()) &&
+    hasKnownStatus(opp) &&
+    !hasFundingAgency(opp) &&
+    !hasOfficialScope(opp) &&
+    !hasKnownEligibility(opp) &&
+    !(opp.awardMin || opp.awardMax || opp.awardTypical) &&
+    !(opp.category?.trim()) &&
+    ((opp.focusAreas?.length ?? 0) === 0)
+  );
+}
+
+function buildInformationGaps(opp: OpportunityInput): string[] {
+  const gaps: string[] = [];
+  if (!hasOfficialScope(opp)) gaps.push("official program description/project scope");
+  if (!hasKnownEligibility(opp)) gaps.push("eligible applicant types");
+  if (!hasFundingAgency(opp)) gaps.push("funding agency");
+  if (!hasKnownStatus(opp)) gaps.push("opportunity status");
+  return gaps;
 }
 
 function orgTypesText(opp: OpportunityInput): string {
@@ -110,6 +177,7 @@ function isSbirLike(text: string): boolean {
 }
 
 function allowsForProfit(opp: OpportunityInput, text: string): boolean {
+  if (!hasKnownEligibility(opp)) return false;
   const types = orgTypesText(opp);
   if (types.includes("SMALL_BUSINESS") || types.includes("FOR_PROFIT")) return true;
   return /\b(small business|for-profit|for profit|sbir|sttr|startup|business of any)\b/.test(
@@ -197,6 +265,47 @@ function assignBucket(
   return null;
 }
 
+function detectScopeDistance(text: string): { distance: ScopeDistance; reasons: string[] } {
+  const nearPatterns = [
+    { re: /\b(small business|main street|local business|entrepreneur|startup)\b/, reason: "small-business support" },
+    { re: /\b(website|web site|workflow|automation|intake|crm|operations system)\b/, reason: "websites, workflow systems, or automation" },
+    { re: /\b(workforce|training|upskill|technical assistance|digital literacy)\b/, reason: "workforce AI or technology training" },
+    { re: /\b(grant management|grant writing|grant assistant|grant software)\b/, reason: "grant management software" },
+  ];
+  const distantPatterns = [
+    { re: /\b(defense|dod|darpa|military|weapon|classified|security-sensitive|national security)\b/, reason: "defense, classified, or security-sensitive work" },
+    { re: /\b(semiconductor|microelectronics|silica|silicon wafer|supply chain)\b/, reason: "semiconductor or specialized supply-chain work" },
+    { re: /\b(international assistance|foreign assistance|usaid|developing countr|global health|embassy)\b/, reason: "international assistance" },
+    { re: /\b(decentralized artificial intelligence|controlled emergence|agent research|multi-agent research)\b/, reason: "specialized decentralized-agent research" },
+    { re: /\b(university|laboratory|lab research|principal investigator|academic research)\b/, reason: "university or laboratory research" },
+  ];
+
+  const nearReasons = nearPatterns.filter((p) => p.re.test(text)).map((p) => p.reason);
+  const distantReasons = distantPatterns.filter((p) => p.re.test(text)).map((p) => p.reason);
+
+  if (distantReasons.length > 0) return { distance: "distant", reasons: distantReasons };
+  if (nearReasons.length > 0) return { distance: "near", reasons: nearReasons };
+  return { distance: "unclear", reasons: [] };
+}
+
+function hasActiveSamUei(org: OrgProfileSnapshot): boolean {
+  const text = [
+    org.missionStatement ?? "",
+    org.programsServices ?? "",
+    org.targetPopulation ?? "",
+    org.geographicArea ?? "",
+    org.pastGrantsNarrative ?? "",
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  return (
+    /\b(sam\.gov|sam)\b/.test(text) &&
+    /\buei\b/.test(text) &&
+    /\b(active|confirmed|registered|current|complete|completed)\b/.test(text)
+  );
+}
+
 const ANGLE_TITLES = {
   clarityHub: "AI Readiness & Clarity Hub for small businesses",
   automationKit: "Local Business Automation Starter Kit",
@@ -239,6 +348,12 @@ export function evaluateOpportunity(
   const text = combinedText(opp);
   const federal = isFederalOpportunity(opp, text);
   const sbir = isSbirLike(text);
+  const informationGaps = buildInformationGaps(opp);
+  const eligibilityKnown = hasKnownEligibility(opp);
+  const officialScopeKnown = hasOfficialScope(opp);
+  const skeletalRecord = onlyTitleAndDeadlineKnown(opp);
+  const infoInsufficient = informationGaps.length > 0;
+  const scopeAssessment = detectScopeDistance(text);
   const forProfitOk = allowsForProfit(opp, text);
   const nonprofitOnly = isNonprofitOnly(opp, text);
   const govOnly = isGovernmentOnly(opp, text);
@@ -302,16 +417,34 @@ export function evaluateOpportunity(
   const sectorRestricted =
     /\b(agricult|restaurant|storefront|manufactur|farm)\b/.test(text) && !oppIsTech;
 
-  let fitScore = 5;
-  if (orgIsTech && oppIsTech) fitScore += 2;
-  if (indianaAligned) fitScore += 1;
-  if (forProfitOk) fitScore += 1;
-  if (bucket) fitScore += 1;
-  if (canApplyDirectly === "no" && couldBeVendorPartner) fitScore -= 3; // vendor route, lower direct fit
-  if (canApplyDirectly === "no" && !couldBeVendorPartner) fitScore -= 5;
-  if (loanOnly) fitScore -= 2;
-  if (sectorRestricted) fitScore -= 2;
-  fitScore = clamp(fitScore, 1, 10);
+  let fitScore: number | null = skeletalRecord ? null : 4;
+  if (fitScore != null && orgIsTech && oppIsTech && officialScopeKnown) fitScore += 1;
+  if (fitScore != null && indianaAligned && officialScopeKnown) fitScore += 1;
+  if (fitScore != null && forProfitOk) fitScore += 1;
+  if (fitScore != null && bucket && officialScopeKnown && eligibilityKnown) fitScore += 1;
+  if (fitScore != null && scopeAssessment.distance === "near" && eligibilityKnown) fitScore += 2;
+  if (fitScore != null && canApplyDirectly === "no" && couldBeVendorPartner) fitScore -= 3; // vendor route, lower direct fit
+  if (fitScore != null && canApplyDirectly === "no" && !couldBeVendorPartner) fitScore -= 5;
+  if (fitScore != null && loanOnly) fitScore -= 2;
+  if (fitScore != null && sectorRestricted) fitScore -= 2;
+  if (fitScore != null && scopeAssessment.distance === "distant") fitScore -= 3;
+  if (fitScore != null && !eligibilityKnown) fitScore = Math.min(fitScore, 4);
+  if (fitScore != null && !eligibilityKnown && !officialScopeKnown) fitScore = Math.min(fitScore, 3);
+  if (fitScore != null && scopeAssessment.distance === "distant" && !forProfitOk)
+    fitScore = Math.min(fitScore, 3);
+  if (fitScore != null) fitScore = clamp(fitScore, 1, 10);
+
+  const scoreConfidence: ScoreConfidence = skeletalRecord
+    ? "insufficient"
+    : infoInsufficient
+      ? "provisional"
+      : "normal";
+  const scoreNotice =
+    scoreConfidence === "insufficient"
+      ? "Insufficient information to score confidently"
+      : scoreConfidence === "provisional"
+        ? "Provisional score - verify scope and eligibility before relying on this fit"
+        : null;
 
   // Match requirement.
   const matchRequirement = /\bmatch(ing)?\b/.test(text)
@@ -326,12 +459,20 @@ export function evaluateOpportunity(
 
   // Why it fits / does not.
   const fitBits: string[] = [];
-  if (orgIsTech && oppIsTech)
-    fitBits.push("aligns with NoCapsAI's AI/automation/software focus");
+  if (orgIsTech && oppIsTech && officialScopeKnown)
+    fitBits.push("has verified scope that overlaps NoCapsAI's AI/automation/software focus");
   if (indianaAligned) fitBits.push("open to Indiana applicants or unrestricted by location");
   if (forProfitOk) fitBits.push("appears open to for-profit small businesses");
   if (bucket) fitBits.push(`maps to Bucket ${bucket.number} (${bucket.name})`);
+  if (scopeAssessment.distance === "near")
+    fitBits.push(`scope resembles ${scopeAssessment.reasons.join(", ")}`);
   const antiBits: string[] = [];
+  if (informationGaps.length)
+    antiBits.push(`missing ${informationGaps.join(", ")}`);
+  if (orgIsTech && oppIsTech && !officialScopeKnown)
+    antiBits.push("broad AI/technology keyword overlap is not enough to establish fit");
+  if (scopeAssessment.distance === "distant")
+    antiBits.push(`program appears distant from NoCapsAI's practical implementation work: ${scopeAssessment.reasons.join(", ")}`);
   if (canApplyDirectly === "no")
     antiBits.push(
       couldBeVendorPartner
@@ -346,14 +487,22 @@ export function evaluateOpportunity(
     " Verify eligibility and open status against the official source before acting.";
 
   // First-draft abstract — templated from approved framing; no invented metrics.
-  const firstDraftAbstract =
-    `${orgName}, an early-stage Indiana technology services company based in Rushville, requests support ` +
-    `from ${opp.funder} to advance "${recommendedAngle}." The project will deliver practical AI, automation, ` +
-    `and digital systems for Indiana small businesses and community organizations. NoCapsAI will ` +
-    `[PLACEHOLDER: specific scope of work and milestones] and measure success by ` +
-    `[PLACEHOLDER: outcome metrics such as systems delivered, time saved, organizations served]. ` +
-    `Requested amount: [VERIFY/CONFIRM amount within the program's range]. ` +
-    `[VERIFY: confirm this opportunity is currently open and that a for-profit Indiana LLC is eligible before applying.]`;
+  const canDraftAbstract =
+    eligibilityKnown &&
+    officialScopeKnown &&
+    scopeAssessment.distance !== "distant" &&
+    canApplyDirectly !== "unknown";
+  const abstractUnavailableReason =
+    "Abstract generation unavailable until official scope and eligibility are verified.";
+  const firstDraftAbstract = canDraftAbstract
+    ? `${orgName}, an early-stage Indiana technology services company based in Rushville, requests support ` +
+      `from ${opp.funder} to advance "${recommendedAngle}." The project will deliver practical AI, automation, ` +
+      `and digital systems that map directly to the verified program scope. NoCapsAI will ` +
+      `[PLACEHOLDER: specific scope of work and milestones] and measure success by ` +
+      `[PLACEHOLDER: outcome metrics such as systems delivered, time saved, organizations served]. ` +
+      `Requested amount: [VERIFY/CONFIRM amount within the program's range]. ` +
+      `[VERIFY: confirm this opportunity is currently open and that a for-profit Indiana LLC is eligible before applying.]`
+    : null;
 
   // Required next action.
   let requiredNextAction: string;
@@ -366,7 +515,11 @@ export function evaluateOpportunity(
   } else {
     requiredNextAction =
       `Verify current open status and for-profit eligibility at ${officialLink}` +
-      (federal ? ", and begin SAM.gov/UEI registration now if not already complete." : ".");
+      (federal
+        ? hasActiveSamUei(org)
+          ? ". SAM.gov and UEI confirmed active."
+          : ", and verify SAM.gov/UEI status before beginning the application."
+        : ".");
   }
 
   return {
@@ -383,9 +536,14 @@ export function evaluateOpportunity(
     requiredAttachments,
     applicationDifficulty,
     fitScore,
+    scoreConfidence,
+    scoreNotice,
+    informationGaps,
+    scopeDistance: scopeAssessment.distance,
     fitRationale,
     recommendedAngle,
     firstDraftAbstract,
+    abstractUnavailableReason: firstDraftAbstract ? null : abstractUnavailableReason,
     requiredNextAction,
     bucket,
     verificationNeeded: true,
@@ -417,6 +575,7 @@ export function buildReadinessChecklist(org: OrgProfileSnapshot): ReadinessCheck
   const has = (v?: string | null) => typeof v === "string" && v.trim().length > 0;
   const orgType = (org.orgType ?? "").toUpperCase();
   const nameIsLlc = (org.name ?? "").toLowerCase().includes("llc");
+  const samUeiActive = hasActiveSamUei(org);
 
   const items: ReadinessItem[] = [
     {
@@ -436,8 +595,10 @@ export function buildReadinessChecklist(org: OrgProfileSnapshot): ReadinessCheck
     },
     {
       label: "SAM.gov UEI registration",
-      status: "verify",
-      note: "Required for federal/SBIR/Grants.gov. Start early — registration can take time.",
+      status: samUeiActive ? "present" : "verify",
+      note: samUeiActive
+        ? "SAM.gov and UEI confirmed active."
+        : "Required for federal/SBIR/Grants.gov. Verify status before beginning the application.",
     },
     {
       label: "DUNS / CAGE code (if required)",
