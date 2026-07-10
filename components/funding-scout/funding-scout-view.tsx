@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   generateFundingScout,
   type FundingScoutReport,
   type OrgProfileSnapshot,
   type SearchStrategy,
+  type SourceBucket,
   CATEGORY_META,
 } from "@/lib/funding-scout";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
@@ -81,7 +82,9 @@ function buildNewOpportunityUrl(params: {
 type RecommendedMoveLane = "NoCapsAI Direct" | "Partner/Client" | "Watchlist" | "Skip";
 type RecommendedMovePriority = "High" | "Medium" | "Low";
 type RecommendedMoveAction =
-  | "Add to Grant Tracker"
+  | "Research Source"
+  | "Verify Eligibility"
+  | "Find Current Program"
   | "Mark as Watchlist"
   | "Assign to Partner/Client"
   | "Skip";
@@ -111,6 +114,63 @@ const MOVE_PRIORITY_BADGE: Record<RecommendedMovePriority, string> = {
   High: "bg-green-100 text-green-700",
   Medium: "bg-amber-100 text-amber-700",
   Low: "bg-gray-100 text-gray-500",
+};
+
+type SourceFilter =
+  | "ALL"
+  | "GRANTS"
+  | "CONTRACTS"
+  | "VENDOR_OPPORTUNITIES"
+  | "LOANS_FINANCING"
+  | "INVESTMENT"
+  | "TAX_CREDITS"
+  | "TECHNICAL_ASSISTANCE"
+  | "RESEARCH_SOURCES";
+
+const SOURCE_FILTERS: { id: SourceFilter; label: string }[] = [
+  { id: "ALL", label: "All" },
+  { id: "GRANTS", label: "Grants" },
+  { id: "CONTRACTS", label: "Contracts" },
+  { id: "VENDOR_OPPORTUNITIES", label: "Vendor Opportunities" },
+  { id: "LOANS_FINANCING", label: "Loans / Financing" },
+  { id: "INVESTMENT", label: "Investment" },
+  { id: "TAX_CREDITS", label: "Tax Credits / Incentives" },
+  { id: "TECHNICAL_ASSISTANCE", label: "Technical Assistance" },
+  { id: "RESEARCH_SOURCES", label: "Research Sources" },
+];
+
+function sourceMatchesFilter(bucket: SourceBucket, filter: SourceFilter): boolean {
+  switch (filter) {
+    case "ALL":
+      return true;
+    case "GRANTS":
+      return bucket.fundingMechanism === "GRANT";
+    case "CONTRACTS":
+      return bucket.fundingMechanism === "CONTRACT";
+    case "VENDOR_OPPORTUNITIES":
+      return bucket.fundingMechanism === "VENDOR_OPPORTUNITY";
+    case "LOANS_FINANCING":
+      return bucket.fundingMechanism === "LOAN_OR_FINANCING";
+    case "INVESTMENT":
+      return bucket.fundingMechanism === "EQUITY_INVESTMENT";
+    case "TAX_CREDITS":
+      return bucket.fundingMechanism === "TAX_CREDIT_OR_INCENTIVE";
+    case "TECHNICAL_ASSISTANCE":
+      return bucket.fundingMechanism === "TECHNICAL_ASSISTANCE";
+    case "RESEARCH_SOURCES":
+      return bucket.fundingMechanism === "RESEARCH_SOURCE";
+  }
+}
+
+const SOURCE_BADGE_CLASS: Record<SourceBucket["fundingMechanism"], string> = {
+  GRANT: "bg-green-50 text-green-700 border-green-200",
+  CONTRACT: "bg-sky-50 text-sky-700 border-sky-200",
+  VENDOR_OPPORTUNITY: "bg-blue-50 text-blue-700 border-blue-200",
+  LOAN_OR_FINANCING: "bg-amber-50 text-amber-700 border-amber-200",
+  EQUITY_INVESTMENT: "bg-purple-50 text-purple-700 border-purple-200",
+  TAX_CREDIT_OR_INCENTIVE: "bg-teal-50 text-teal-700 border-teal-200",
+  TECHNICAL_ASSISTANCE: "bg-gray-50 text-gray-700 border-gray-200",
+  RESEARCH_SOURCE: "bg-orange-50 text-orange-700 border-orange-200",
 };
 
 function getRecommendedMoves(report: FundingScoutReport): RecommendedMove[] {
@@ -151,7 +211,7 @@ function getRecommendedMoves(report: FundingScoutReport): RecommendedMove[] {
       why: "This is the strongest near-term lane for an Indiana for-profit AI/software company: rural small-business automation, websites, workflow tools, and technology adoption.",
       nextAction: "Verify source first: confirm a current local, OCRA, chamber, utility, bank, or community foundation program is open and explicitly supports for-profit technology adoption.",
       priority: "High",
-      actionLabel: "Add to Grant Tracker",
+      actionLabel: "Research Source",
       sourceIds: ["local-digital-transformation", "iedc-incentives"],
       applicantTypeRequired: "For-profit small business or Indiana technology company",
       nocapsCanApplyDirectly: true,
@@ -176,7 +236,7 @@ function getRecommendedMoves(report: FundingScoutReport): RecommendedMove[] {
       why: "Pitch and accelerator programs can fit software/startup growth better than generic nonprofit foundation grants.",
       nextAction: "Verify source first, then only advance if GrantFlow is positioned as a software product with a clear startup narrative, traction plan, and use of funds.",
       priority: "High",
-      actionLabel: "Add to Grant Tracker",
+      actionLabel: "Verify Eligibility",
       sourceIds: ["elevate-ventures"],
       applicantTypeRequired: "Indiana startup, software company, or tech ecosystem participant",
       nocapsCanApplyDirectly: true,
@@ -202,7 +262,7 @@ function getRecommendedMoves(report: FundingScoutReport): RecommendedMove[] {
       why: "Procurement can fund AI automation, software, websites, and workflow services without requiring nonprofit status.",
       nextAction: "Verify SAM.gov, Indiana procurement, subcontracting, NAICS fit, registration requirements, and open solicitation status.",
       priority: "High",
-      actionLabel: "Add to Grant Tracker",
+      actionLabel: "Research Source",
       sourceIds: ["government-contracting"],
       applicantTypeRequired: "For-profit vendor, small business, subcontractor, or registered supplier",
       nocapsCanApplyDirectly: true,
@@ -215,7 +275,7 @@ function getRecommendedMoves(report: FundingScoutReport): RecommendedMove[] {
       why: "These may still be useful, but NoCapsAI LLC should support an eligible applicant instead of being listed as lead applicant.",
       nextAction: "Assign to an eligible nonprofit, public entity, school, or client; position NoCapsAI as grant writer, vendor, contractor, or technical partner.",
       priority: "High",
-      actionLabel: "Assign to Partner/Client",
+      actionLabel: "Verify Eligibility",
       sourceIds: ["nonprofit-vendor", "grants-gov-biz"],
       applicantTypeRequired: "501(c)(3), government/public entity, nonprofit, school, or eligible partner",
       nocapsCanApplyDirectly: false,
@@ -263,6 +323,14 @@ export function FundingScoutView({ org }: FundingScoutViewProps) {
   const [running, setRunning]                   = useState(false);
   const [expandedSources, setExpandedSources]   = useState<Set<string>>(new Set());
   const [expandedDisqualifiers, setExpandedDisqualifiers] = useState(false);
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("ALL");
+
+  useEffect(() => {
+    setReport(null);
+    setExpandedSources(new Set());
+    setExpandedDisqualifiers(false);
+    setSourceFilter("ALL");
+  }, [org.name, org.orgType]);
 
   const handleRun = () => {
     setRunning(true);
@@ -282,6 +350,9 @@ export function FundingScoutView({ org }: FundingScoutViewProps) {
   };
 
   const profileIncomplete = (org.profileCompleteness ?? 0) < 40;
+  const visibleSources = report
+    ? report.sourceBuckets.filter((bucket) => sourceMatchesFilter(bucket, sourceFilter))
+    : [];
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
@@ -361,7 +432,10 @@ export function FundingScoutView({ org }: FundingScoutViewProps) {
             </CardHeader>
             <div className="space-y-3">
               {getRecommendedMoves(report).map((move, index) => {
-                const moveUrl = getMoveUrl(report, move);
+                const source = report.sourceBuckets.find((bucket) =>
+                  move.sourceIds.includes(bucket.id)
+                );
+                const moveUrl = source?.url ?? "/funding-scout";
                 return (
                   <div
                     key={move.title}
@@ -395,15 +469,20 @@ export function FundingScoutView({ org }: FundingScoutViewProps) {
                           </p>
                         </div>
                       </div>
-                      <Link href={moveUrl} className="shrink-0">
+                      <a
+                        href={moveUrl}
+                        target={moveUrl.startsWith("http") ? "_blank" : undefined}
+                        rel={moveUrl.startsWith("http") ? "noopener noreferrer" : undefined}
+                        className="shrink-0"
+                      >
                         <Button
                           size="sm"
                           variant={move.lane === "Skip" ? "ghost" : "secondary"}
-                          icon={move.actionLabel === "Add to Grant Tracker" ? <PlusCircle size={14} /> : undefined}
+                          icon={move.actionLabel === "Research Source" ? <Search size={14} /> : undefined}
                         >
                           {move.actionLabel}
                         </Button>
-                      </Link>
+                      </a>
                     </div>
                   </div>
                 );
@@ -493,8 +572,29 @@ export function FundingScoutView({ org }: FundingScoutViewProps) {
               </h3>
               <span className="text-xs text-gray-400">(A = highest priority)</span>
             </div>
+            <div className="mb-3 flex flex-wrap gap-2">
+              {SOURCE_FILTERS.map((filter) => (
+                <button
+                  key={filter.id}
+                  type="button"
+                  onClick={() => setSourceFilter(filter.id)}
+                  className={`rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors ${
+                    sourceFilter === filter.id
+                      ? "border-brand-300 bg-brand-50 text-brand-700"
+                      : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
             <div className="space-y-3">
-              {report.sourceBuckets.map((bucket) => {
+              {visibleSources.length === 0 && (
+                <div className="rounded-md border border-gray-100 bg-gray-50 px-4 py-3 text-sm text-gray-500">
+                  No sources in this filter for {report.orgName}.
+                </div>
+              )}
+              {visibleSources.map((bucket) => {
                 const meta = CATEGORY_META[bucket.category];
                 const isExpanded = expandedSources.has(bucket.id);
                 const newOpportunityUrl = buildNewOpportunityUrl({
@@ -519,8 +619,11 @@ export function FundingScoutView({ org }: FundingScoutViewProps) {
                         <p className="text-sm font-semibold text-gray-900">{bucket.name}</p>
                         <p className="text-xs text-gray-500">{meta.label}</p>
                         <div className="mt-1 flex flex-wrap gap-1.5">
+                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${SOURCE_BADGE_CLASS[bucket.fundingMechanism]}`}>
+                            {bucket.badgeLabel}
+                          </span>
                           <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-600">
-                            {bucket.sourceType}
+                            {bucket.verificationLabel}
                           </span>
                         </div>
                       </div>
@@ -547,6 +650,25 @@ export function FundingScoutView({ org }: FundingScoutViewProps) {
                     {isExpanded && (
                       <div className="px-5 pb-5 border-t border-gray-100 space-y-4 bg-gray-50/50">
                         <p className="text-sm text-gray-600 pt-3">{bucket.description}</p>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <div className="rounded-md border border-gray-100 bg-white px-3 py-2">
+                            <p className="text-[11px] font-semibold uppercase text-gray-400">Organization eligibility</p>
+                            <p className="text-xs text-gray-700 mt-0.5">{bucket.eligibilityLabel}</p>
+                          </div>
+                          <div className="rounded-md border border-gray-100 bg-white px-3 py-2">
+                            <p className="text-[11px] font-semibold uppercase text-gray-400">Deadline status</p>
+                            <p className="text-xs text-gray-700 mt-0.5">{bucket.deadlineStatus}</p>
+                          </div>
+                          <div className="rounded-md border border-gray-100 bg-white px-3 py-2">
+                            <p className="text-[11px] font-semibold uppercase text-gray-400">Funding mechanism</p>
+                            <p className="text-xs text-gray-700 mt-0.5">{bucket.badgeLabel}</p>
+                          </div>
+                          <div className="rounded-md border border-gray-100 bg-white px-3 py-2">
+                            <p className="text-[11px] font-semibold uppercase text-gray-400">Last verified</p>
+                            <p className="text-xs text-gray-700 mt-0.5">{bucket.lastVerifiedDate ?? "Not verified as a current opportunity"}</p>
+                          </div>
+                        </div>
 
                         <div>
                           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
@@ -595,15 +717,28 @@ export function FundingScoutView({ org }: FundingScoutViewProps) {
                             Visit {bucket.name}
                           </a>
 
-                          <Link href={newOpportunityUrl}>
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              icon={<PlusCircle size={14} />}
+                          {bucket.canAddVerifiedOpportunity ? (
+                            <Link href={newOpportunityUrl}>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                icon={<PlusCircle size={14} />}
+                              >
+                                Add Verified Opportunity
+                              </Button>
+                            </Link>
+                          ) : (
+                            <a
+                              href={bucket.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex"
                             >
-                              Add Verified Opportunity
-                            </Button>
-                          </Link>
+                              <Button size="sm" variant="secondary" icon={<Search size={14} />}>
+                                {bucket.researchActionLabel}
+                              </Button>
+                            </a>
+                          )}
                         </div>
                       </div>
                     )}

@@ -26,6 +26,24 @@ export interface OrgProfileSnapshot {
 // ── Output Types ─────────────────────────────────────────────────────────────
 
 export type SourceCategory = "A" | "B" | "C" | "D" | "E" | "F" | "G";
+export type SourceClassification =
+  | "VERIFIED_OPPORTUNITY"
+  | "OFFICIAL_PROGRAM_SOURCE"
+  | "ADVISORY_OR_REFERRAL_SOURCE"
+  | "RESEARCH_LANE"
+  | "CONTRACTING_OR_VENDOR_OPPORTUNITY";
+export type OrgEligibilityProfile =
+  | "FOR_PROFIT_SMALL_BUSINESS"
+  | "NONPROFIT_501C3";
+export type FundingMechanism =
+  | "GRANT"
+  | "CONTRACT"
+  | "VENDOR_OPPORTUNITY"
+  | "LOAN_OR_FINANCING"
+  | "EQUITY_INVESTMENT"
+  | "TAX_CREDIT_OR_INCENTIVE"
+  | "TECHNICAL_ASSISTANCE"
+  | "RESEARCH_SOURCE";
 export type FundingSourceType =
   | "Direct grant or award program"
   | "Accelerator or pitch competition"
@@ -51,6 +69,15 @@ export interface SourceBucket {
   name: string;
   category: SourceCategory;
   categoryLabel: string;
+  classification: SourceClassification;
+  eligibleProfiles: OrgEligibilityProfile[];
+  fundingMechanism: FundingMechanism;
+  badgeLabel: string;
+  eligibilityLabel: string;
+  deadlineStatus: string;
+  lastVerifiedDate?: string;
+  canAddVerifiedOpportunity: boolean;
+  researchActionLabel: string;
   sourceType: FundingSourceType;
   verificationLabel: VerificationLabel;
   url: string;
@@ -137,14 +164,50 @@ function isBusinessProfile(org: OrgProfileSnapshot): boolean {
   return false;
 }
 
+function getOrgEligibilityProfile(org: OrgProfileSnapshot): OrgEligibilityProfile {
+  return isBusinessProfile(org) ? "FOR_PROFIT_SMALL_BUSINESS" : "NONPROFIT_501C3";
+}
+
+function filterSourcesForProfile(
+  buckets: SourceBucket[],
+  profile: OrgEligibilityProfile
+): SourceBucket[] {
+  return buckets.filter((bucket) => bucket.eligibleProfiles.includes(profile));
+}
+
 // ── NONPROFIT: Static Source Buckets ─────────────────────────────────────────
 // Priority order: A (local) → B (state MH) → C (regional foundations) → D (corporate) → E (federal)
 
 type StaticBucket = Omit<
   SourceBucket,
-  "recommendedSearchTerms" | "sourceType" | "verificationLabel"
+  | "recommendedSearchTerms"
+  | "sourceType"
+  | "verificationLabel"
+  | "classification"
+  | "eligibleProfiles"
+  | "fundingMechanism"
+  | "badgeLabel"
+  | "eligibilityLabel"
+  | "deadlineStatus"
+  | "canAddVerifiedOpportunity"
+  | "researchActionLabel"
 > &
-  Partial<Pick<SourceBucket, "sourceType" | "verificationLabel">>;
+  Partial<
+    Pick<
+      SourceBucket,
+      | "sourceType"
+      | "verificationLabel"
+      | "classification"
+      | "eligibleProfiles"
+      | "fundingMechanism"
+      | "badgeLabel"
+      | "eligibilityLabel"
+      | "deadlineStatus"
+      | "lastVerifiedDate"
+      | "canAddVerifiedOpportunity"
+      | "researchActionLabel"
+    >
+  >;
 
 const NONPROFIT_STATIC_BUCKETS: StaticBucket[] = [
   {
@@ -180,6 +243,13 @@ const NONPROFIT_STATIC_BUCKETS: StaticBucket[] = [
     name: "Prevention Insights / Indiana Prevention Funding",
     category: "B",
     categoryLabel: "Indiana Mental Health / Prevention",
+    classification: "ADVISORY_OR_REFERRAL_SOURCE",
+    fundingMechanism: "TECHNICAL_ASSISTANCE",
+    badgeLabel: "Advisory / Referral",
+    eligibilityLabel: "Indiana nonprofit prevention and mental-health funding navigation",
+    deadlineStatus: "Referral source only; verify any listed program separately",
+    canAddVerifiedOpportunity: false,
+    researchActionLabel: "Visit Official Source",
     sourceType: "Technical assistance or advisory organization",
     verificationLabel: "Advisory or referral source",
     url: "https://preventioninsights.iu.edu/",
@@ -246,10 +316,59 @@ const NONPROFIT_STATIC_BUCKETS: StaticBucket[] = [
     verificationNeeded: true,
   },
   {
+    id: "indiana-nonprofit-resource-network",
+    name: "Indiana Nonprofit Resource Network / Capacity Building",
+    category: "C",
+    categoryLabel: "Nonprofit Capacity Building",
+    classification: "ADVISORY_OR_REFERRAL_SOURCE",
+    fundingMechanism: "TECHNICAL_ASSISTANCE",
+    badgeLabel: "Advisory / Referral",
+    eligibilityLabel: "Indiana nonprofit capacity-building and training fit",
+    deadlineStatus: "Advisory source only; verify any referred grant or program separately",
+    canAddVerifiedOpportunity: false,
+    researchActionLabel: "Visit Official Source",
+    sourceType: "Technical assistance or advisory organization",
+    verificationLabel: "Advisory or referral source",
+    url: "https://inrn.org/",
+    description:
+      "Indiana nonprofit capacity-building and training source. Use it for nonprofit readiness, governance, fundraising, and referral research, not as a verified grant.",
+    fitReason:
+      "Useful for Twizted Journeys capacity building, board readiness, fundraising systems, and nonprofit training needs.",
+    verificationNeeded: true,
+  },
+  {
+    id: "techsoup-nonprofit-technology",
+    name: "TechSoup Nonprofit Technology Support",
+    category: "C",
+    categoryLabel: "Nonprofit Technology Support",
+    classification: "ADVISORY_OR_REFERRAL_SOURCE",
+    fundingMechanism: "TECHNICAL_ASSISTANCE",
+    badgeLabel: "Advisory / Referral",
+    eligibilityLabel: "501(c)(3)-eligible nonprofit technology support and discounts",
+    deadlineStatus: "Support source only; verify any current offer, grant, or discount separately",
+    canAddVerifiedOpportunity: false,
+    researchActionLabel: "Visit Official Source",
+    sourceType: "Technical assistance or advisory organization",
+    verificationLabel: "Advisory or referral source",
+    url: "https://www.techsoup.org/",
+    description:
+      "Nonprofit technology support and software-discount source. Treat as nonprofit technology assistance, not as a verified grant opportunity.",
+    fitReason:
+      "Relevant for Twizted Journeys technology capacity, resource access, QR-code outreach, website, data, and back-office tools.",
+    verificationNeeded: true,
+  },
+  {
     id: "grants-gov",
     name: "Grants.gov (Federal Fallback)",
     category: "E",
     categoryLabel: "Federal Grants.gov Sources",
+    classification: "RESEARCH_LANE",
+    fundingMechanism: "RESEARCH_SOURCE",
+    badgeLabel: "Research Needed",
+    eligibilityLabel: "Nonprofit and 501(c)(3)-eligible federal fallback search; verify every result",
+    deadlineStatus: "Live search source; verify current open or forecasted status per result",
+    canAddVerifiedOpportunity: false,
+    researchActionLabel: "Research Current Programs",
     sourceType: "Federal live-search source",
     verificationLabel: "Live search available",
     url: "https://grants.gov",
@@ -391,15 +510,43 @@ const BUSINESS_STATIC_BUCKETS: StaticBucket[] = [
 
 const BUSINESS_REFINED_BUCKETS: StaticBucket[] = [
   {
-    id: "local-digital-transformation",
-    name: "Rush County / Rural Indiana Digital Transformation",
+    id: "indiana-sbdc-intap",
+    name: "Indiana SBDC INTAP",
     category: "A",
-    categoryLabel: "Rural Indiana / Digital Transformation",
+    categoryLabel: "A1. Indiana SBDC INTAP",
+    classification: "OFFICIAL_PROGRAM_SOURCE",
+    fundingMechanism: "TECHNICAL_ASSISTANCE",
+    badgeLabel: "Official Program Source",
+    eligibilityLabel: "Indiana small-business technical-assistance fit; verify current INTAP terms",
+    deadlineStatus: "Official source only; verify current application window",
+    canAddVerifiedOpportunity: false,
+    researchActionLabel: "Visit Official Source",
+    sourceType: "Technical assistance or advisory organization",
+    verificationLabel: "Official program source",
+    url: "https://www.isbdc.org/intap/",
+    description:
+      "Indiana SBDC INTAP is an official source for Indiana technical-assistance support. Do not save it as a verified opportunity until the current program name, application window, applicant type, funding mechanism, and deadline or rolling status are confirmed.",
+    fitReason:
+      "Best near-term source to verify for practical technology, process, and business-growth assistance for an Indiana for-profit small business.",
+    verificationNeeded: true,
+  },
+  {
+    id: "local-digital-transformation",
+    name: "Local Funding Research Lane: Rush County and Rural Indiana",
+    category: "B",
+    categoryLabel: "B1. Local Funding Research",
+    classification: "RESEARCH_LANE",
+    fundingMechanism: "RESEARCH_SOURCE",
+    badgeLabel: "Research Needed",
+    eligibilityLabel: "Potential Indiana for-profit small-business fit, but no current program confirmed",
+    deadlineStatus: "No application or funding program has been confirmed",
+    canAddVerifiedOpportunity: false,
+    researchActionLabel: "Research Current Programs",
     sourceType: "Local program search lane",
     verificationLabel: "Manual verification required",
     url: "https://www.in.gov/ocra/",
     description:
-      "Local, county, OCRA, chamber, utility, bank, and community foundation programs may support rural small-business websites, software, automation, training, and digital operations. Verify a current program before treating any local organization as a funder.",
+      "Local, county, OCRA, chamber, utility, bank, and community foundation programs may support rural small-business websites, software, automation, training, and digital operations. No application or funding program has been confirmed; research current programs before treating any local organization as a funder.",
     fitReason:
       "Highest-priority lane for a rural Indiana AI/software company: close geography, practical digital transformation, and lower application burden than federal R&D.",
     verificationNeeded: true,
@@ -408,7 +555,14 @@ const BUSINESS_REFINED_BUCKETS: StaticBucket[] = [
     id: "indiana-sbdc",
     name: "Indiana SBDC - Small Business Development Center",
     category: "A",
-    categoryLabel: "Technical Assistance / Referrals",
+    categoryLabel: "A2. Indiana SBDC Advising / Funding Navigation",
+    classification: "ADVISORY_OR_REFERRAL_SOURCE",
+    fundingMechanism: "TECHNICAL_ASSISTANCE",
+    badgeLabel: "Advisory / Referral",
+    eligibilityLabel: "Indiana for-profit small-business advisory fit",
+    deadlineStatus: "No direct grant deadline; verify any referred program separately",
+    canAddVerifiedOpportunity: false,
+    researchActionLabel: "Visit Official Source",
     sourceType: "Technical assistance or advisory organization",
     verificationLabel: "Advisory or referral source",
     url: "https://www.isbdc.org/",
@@ -422,7 +576,14 @@ const BUSINESS_REFINED_BUCKETS: StaticBucket[] = [
     id: "iedc-incentives",
     name: "IEDC - Indiana Economic Development Corporation",
     category: "A",
-    categoryLabel: "State Incentives / Innovation",
+    categoryLabel: "A3. IEDC Entrepreneurship / Innovation / Capital",
+    classification: "OFFICIAL_PROGRAM_SOURCE",
+    fundingMechanism: "TAX_CREDIT_OR_INCENTIVE",
+    badgeLabel: "Official Program Source",
+    eligibilityLabel: "Potential Indiana for-profit business fit; verify each program",
+    deadlineStatus: "Program source only; verify current open or upcoming status",
+    canAddVerifiedOpportunity: false,
+    researchActionLabel: "Verify Eligibility",
     sourceType: "Tax credit or economic incentive",
     verificationLabel: "Official program source",
     url: "https://iedc.in.gov/",
@@ -433,10 +594,38 @@ const BUSINESS_REFINED_BUCKETS: StaticBucket[] = [
     verificationNeeded: true,
   },
   {
+    id: "indiana-sbir-support",
+    name: "Indiana SBIR/STTR Support and Matching Programs",
+    category: "A",
+    categoryLabel: "A4. Indiana SBIR/STTR Support",
+    classification: "OFFICIAL_PROGRAM_SOURCE",
+    fundingMechanism: "GRANT",
+    badgeLabel: "Official Program Source",
+    eligibilityLabel: "Indiana for-profit small business with documented R&D project",
+    deadlineStatus: "Verify current state support or matching program before saving",
+    canAddVerifiedOpportunity: false,
+    researchActionLabel: "Verify Eligibility",
+    sourceType: "Government small-business program source",
+    verificationLabel: "Official program source",
+    url: "https://www.sbir.gov/local-resources/IN",
+    description:
+      "Indiana SBIR/STTR support and matching programs should be treated as official program sources until a specific open state support, matching, or assistance program is confirmed.",
+    fitReason:
+      "Useful after NoCapsAI documents a genuine R&D/product-development project rather than ordinary consulting, website development, or automation services.",
+    verificationNeeded: true,
+  },
+  {
     id: "elevate-ventures",
     name: "Elevate Ventures",
     category: "B",
-    categoryLabel: "Startup Capital / Pitch",
+    categoryLabel: "B2. Startup Investment / Acceleration",
+    classification: "OFFICIAL_PROGRAM_SOURCE",
+    fundingMechanism: "EQUITY_INVESTMENT",
+    badgeLabel: "Official Program Source",
+    eligibilityLabel: "Indiana startup support; verify stage and mechanism",
+    deadlineStatus: "Verify current program cycle before saving",
+    canAddVerifiedOpportunity: false,
+    researchActionLabel: "Verify Eligibility",
     sourceType: "Accelerator or pitch competition",
     verificationLabel: "Official program source",
     url: "https://www.elevateventures.com/",
@@ -449,8 +638,15 @@ const BUSINESS_REFINED_BUCKETS: StaticBucket[] = [
   {
     id: "techpoint",
     name: "TechPoint",
-    category: "B",
-    categoryLabel: "Tech Ecosystem / Referrals",
+    category: "C",
+    categoryLabel: "C1. Tech Ecosystem / Referrals",
+    classification: "ADVISORY_OR_REFERRAL_SOURCE",
+    fundingMechanism: "TECHNICAL_ASSISTANCE",
+    badgeLabel: "Advisory / Referral",
+    eligibilityLabel: "Indiana tech ecosystem and referral fit",
+    deadlineStatus: "No direct grant deadline; verify any referred program separately",
+    canAddVerifiedOpportunity: false,
+    researchActionLabel: "Visit Official Source",
     sourceType: "Technical assistance or advisory organization",
     verificationLabel: "Advisory or referral source",
     url: "https://techpoint.org/",
@@ -464,7 +660,14 @@ const BUSINESS_REFINED_BUCKETS: StaticBucket[] = [
     id: "indy-chamber",
     name: "Indy Chamber / Regional Small Business Support",
     category: "C",
-    categoryLabel: "Regional Advisory / Financing",
+    categoryLabel: "C2. Regional Advisory / Financing",
+    classification: "ADVISORY_OR_REFERRAL_SOURCE",
+    fundingMechanism: "TECHNICAL_ASSISTANCE",
+    badgeLabel: "Advisory / Referral",
+    eligibilityLabel: "Regional small-business advisory and referral fit",
+    deadlineStatus: "No direct grant deadline; verify any referred program separately",
+    canAddVerifiedOpportunity: false,
+    researchActionLabel: "Visit Official Source",
     sourceType: "Technical assistance or advisory organization",
     verificationLabel: "Advisory or referral source",
     url: "https://www.indychamber.com/",
@@ -477,8 +680,15 @@ const BUSINESS_REFINED_BUCKETS: StaticBucket[] = [
   {
     id: "government-contracting",
     name: "Indiana / Federal Government Contracting",
-    category: "G",
-    categoryLabel: "Government Procurement",
+    category: "A",
+    categoryLabel: "A5. Indiana / Federal Government Contracting",
+    classification: "CONTRACTING_OR_VENDOR_OPPORTUNITY",
+    fundingMechanism: "CONTRACT",
+    badgeLabel: "Contract / Vendor Opportunity",
+    eligibilityLabel: "For-profit vendor, small business, subcontractor, or registered supplier",
+    deadlineStatus: "Search source only; verify open solicitation status",
+    canAddVerifiedOpportunity: false,
+    researchActionLabel: "Research Current Programs",
     sourceType: "Procurement or contracting opportunity",
     verificationLabel: "Official search source",
     url: "https://www.sam.gov/",
@@ -491,8 +701,15 @@ const BUSINESS_REFINED_BUCKETS: StaticBucket[] = [
   {
     id: "nonprofit-vendor",
     name: "Nonprofit Technology Vendor Opportunities",
-    category: "D",
-    categoryLabel: "Partner / Vendor",
+    category: "B",
+    categoryLabel: "B3. Partner / Vendor",
+    classification: "CONTRACTING_OR_VENDOR_OPPORTUNITY",
+    fundingMechanism: "VENDOR_OPPORTUNITY",
+    badgeLabel: "Contract / Vendor Opportunity",
+    eligibilityLabel: "NoCapsAI as vendor/partner to an eligible nonprofit or public applicant",
+    deadlineStatus: "Verify client grant cycle or procurement deadline",
+    canAddVerifiedOpportunity: false,
+    researchActionLabel: "Research Current Programs",
     sourceType: "Procurement or contracting opportunity",
     verificationLabel: "Manual verification required",
     url: "https://www.grants.gov/",
@@ -506,7 +723,14 @@ const BUSINESS_REFINED_BUCKETS: StaticBucket[] = [
     id: "sba-sbir",
     name: "SBA SBIR / STTR Program",
     category: "E",
-    categoryLabel: "SBIR / STTR",
+    categoryLabel: "E1. Federal SBIR / STTR",
+    classification: "OFFICIAL_PROGRAM_SOURCE",
+    fundingMechanism: "GRANT",
+    badgeLabel: "Official Program Source",
+    eligibilityLabel: "For-profit small business with genuine R&D project",
+    deadlineStatus: "Verify active agency solicitation and deadline",
+    canAddVerifiedOpportunity: false,
+    researchActionLabel: "Verify Eligibility",
     sourceType: "Direct grant or award program",
     verificationLabel: "Official program source",
     url: "https://www.sbir.gov/",
@@ -520,7 +744,14 @@ const BUSINESS_REFINED_BUCKETS: StaticBucket[] = [
     id: "nsf-seed-fund",
     name: "NSF SBIR/STTR - America's Seed Fund",
     category: "E",
-    categoryLabel: "SBIR / STTR",
+    categoryLabel: "E1. Federal SBIR / STTR",
+    classification: "OFFICIAL_PROGRAM_SOURCE",
+    fundingMechanism: "GRANT",
+    badgeLabel: "Official Program Source",
+    eligibilityLabel: "For-profit small business with documented R&D/product innovation",
+    deadlineStatus: "Verify Project Pitch and current solicitation timing",
+    canAddVerifiedOpportunity: false,
+    researchActionLabel: "Verify Eligibility",
     sourceType: "Direct grant or award program",
     verificationLabel: "Official program source",
     url: "https://seedfund.nsf.gov/",
@@ -534,7 +765,14 @@ const BUSINESS_REFINED_BUCKETS: StaticBucket[] = [
     id: "sba-programs",
     name: "SBA - Small Business Administration Programs",
     category: "E",
-    categoryLabel: "SBA / Financing / Certifications",
+    categoryLabel: "E2. SBA / Financing / Certifications",
+    classification: "OFFICIAL_PROGRAM_SOURCE",
+    fundingMechanism: "LOAN_OR_FINANCING",
+    badgeLabel: "Official Program Source",
+    eligibilityLabel: "For-profit small-business support; classify the specific program",
+    deadlineStatus: "Program source only; verify specific program timing",
+    canAddVerifiedOpportunity: false,
+    researchActionLabel: "Verify Eligibility",
     sourceType: "Government small-business program source",
     verificationLabel: "Official program source",
     url: "https://www.sba.gov/",
@@ -548,7 +786,14 @@ const BUSINESS_REFINED_BUCKETS: StaticBucket[] = [
     id: "grants-gov-biz",
     name: "Grants.gov (Federal Fallback)",
     category: "F",
-    categoryLabel: "Federal Grants.gov Sources",
+    categoryLabel: "F1. Federal Grants.gov Fallback",
+    classification: "RESEARCH_LANE",
+    fundingMechanism: "RESEARCH_SOURCE",
+    badgeLabel: "Research Needed",
+    eligibilityLabel: "Fallback search only; exclude results that do not allow for-profit applicants",
+    deadlineStatus: "Live search source; verify every opportunity before saving",
+    canAddVerifiedOpportunity: false,
+    researchActionLabel: "Research Current Programs",
     sourceType: "Federal live-search source",
     verificationLabel: "Live search available",
     url: "https://grants.gov",
@@ -907,8 +1152,10 @@ interface ExtractedKeywords {
   hasStigmaReduction: boolean;
   hasYouth: boolean;
   hasFamily: boolean;
+  hasVeterans: boolean;
   hasAI: boolean;
   hasTech: boolean;
+  hasCapacityBuilding: boolean;
   hasWorkforce: boolean;
   hasNonprofitSupport: boolean;
   stateLabel: string;
@@ -970,6 +1217,10 @@ function extractKeywords(org: OrgProfileSnapshot): ExtractedKeywords {
       text.includes("family") ||
       text.includes("families") ||
       text.includes("caregiver"),
+    hasVeterans:
+      text.includes("veteran") ||
+      text.includes("military") ||
+      text.includes("service member"),
     hasAI:
       text.includes("artificial intelligence") ||
       text.includes("ai ") ||
@@ -982,7 +1233,15 @@ function extractKeywords(org: OrgProfileSnapshot): ExtractedKeywords {
       text.includes("tech") ||
       text.includes("platform") ||
       text.includes("app ") ||
+      text.includes("qr") ||
+      text.includes("website") ||
       text.includes("saas"),
+    hasCapacityBuilding:
+      text.includes("capacity") ||
+      text.includes("board") ||
+      text.includes("fundraising") ||
+      text.includes("governance") ||
+      text.includes("training"),
     hasWorkforce:
       text.includes("workforce") ||
       text.includes("job") ||
@@ -1096,6 +1355,41 @@ function buildNonprofitStrategies(
       priority: "medium",
       categoryLabel: "Indiana / Regional",
       suggestedSources: ["CICF", "Lilly Endowment", "United Way"],
+    });
+  }
+
+  if (kw.hasVeterans) {
+    strategies.push({
+      term: `veteran mental health outreach ${stateLabel} nonprofit grants`,
+      priority: "medium",
+      categoryLabel: "Veteran Outreach",
+      suggestedSources: ["Indiana FSSA / DMHA", "CICF", "Grants.gov"],
+    });
+  }
+
+  if (kw.hasCapacityBuilding || kw.hasNonprofitSupport) {
+    strategies.push({
+      term: `${stateLabel} nonprofit capacity building grants`,
+      priority: "medium",
+      categoryLabel: "Capacity Building",
+      suggestedSources: [
+        "Indiana Nonprofit Resource Network",
+        "CICF",
+        "Lilly Endowment",
+      ],
+    });
+  }
+
+  if (kw.hasTech) {
+    strategies.push({
+      term: "nonprofit technology support grants QR website systems",
+      priority: "medium",
+      categoryLabel: "Technology Support",
+      suggestedSources: [
+        "TechSoup",
+        "Indiana Nonprofit Resource Network",
+        "Grants.gov",
+      ],
     });
   }
 
@@ -1425,6 +1719,20 @@ function attachNonprofitSearchTerms(
           "community education mental health",
         ];
         break;
+      case "indiana-nonprofit-resource-network":
+        terms = [
+          "Indiana nonprofit capacity building grants",
+          "nonprofit board governance fundraising training Indiana",
+          "nonprofit community education capacity building",
+        ];
+        break;
+      case "techsoup-nonprofit-technology":
+        terms = [
+          "nonprofit technology support grants QR website systems",
+          "nonprofit software discounts technology capacity",
+          "nonprofit website data tools community outreach",
+        ];
+        break;
       case "grants-gov":
         terms = strategies
           .filter((s) => s.priority === "low")
@@ -1438,6 +1746,22 @@ function attachNonprofitSearchTerms(
 
     return {
       ...bucket,
+      classification: bucket.classification ?? "OFFICIAL_PROGRAM_SOURCE",
+      eligibleProfiles: bucket.eligibleProfiles ?? ["NONPROFIT_501C3"],
+      fundingMechanism: bucket.fundingMechanism ?? "GRANT",
+      badgeLabel:
+        bucket.badgeLabel ??
+        (bucket.verificationLabel === "Advisory or referral source"
+          ? "Advisory / Referral"
+          : "Official Program Source"),
+      eligibilityLabel:
+        bucket.eligibilityLabel ??
+        "Nonprofit and 501(c)(3)-eligible source; verify active program terms",
+      deadlineStatus:
+        bucket.deadlineStatus ??
+        "Verify current open, upcoming, rolling, or closed status before saving",
+      canAddVerifiedOpportunity: bucket.canAddVerifiedOpportunity ?? false,
+      researchActionLabel: bucket.researchActionLabel ?? "Verify Eligibility",
       sourceType: bucket.sourceType ?? "Direct grant or award program",
       verificationLabel: bucket.verificationLabel ?? "Manual verification required",
       recommendedSearchTerms: terms,
@@ -1446,6 +1770,23 @@ function attachNonprofitSearchTerms(
 }
 
 // ── Source Term Mapping — Business ────────────────────────────────────────────
+
+const BUSINESS_SOURCE_PRIORITY: Record<string, number> = {
+  "indiana-sbdc-intap": 1,
+  "indiana-sbdc": 2,
+  "iedc-incentives": 3,
+  "indiana-sbir-support": 4,
+  "government-contracting": 5,
+  "local-digital-transformation": 6,
+  "elevate-ventures": 7,
+  "nonprofit-vendor": 8,
+  techpoint: 9,
+  "indy-chamber": 10,
+  "sba-sbir": 11,
+  "nsf-seed-fund": 12,
+  "sba-programs": 13,
+  "grants-gov-biz": 14,
+};
 
 function attachBusinessSearchTerms(
   strategies: SearchStrategy[],
@@ -1490,6 +1831,13 @@ function attachBusinessSearchTerms(
           "rural business automation funding",
         ];
         break;
+      case "indiana-sbdc-intap":
+        terms = [
+          "Indiana SBDC INTAP",
+          "Indiana technical assistance program small business",
+          "Indiana small business technology assistance",
+        ];
+        break;
       case "iedc-incentives":
         terms = termsFor(["IEDC"]);
         if (terms.length === 0)
@@ -1498,6 +1846,13 @@ function attachBusinessSearchTerms(
             "IEDC technology and innovation programs",
             "Indiana innovation incentive software startup",
           ];
+        break;
+      case "indiana-sbir-support":
+        terms = [
+          "Indiana SBIR STTR matching program",
+          "Indiana SBIR support small business",
+          "Indiana technology commercialization assistance",
+        ];
         break;
       case "elevate-ventures":
         terms = termsFor(["Elevate"]);
@@ -1584,11 +1939,25 @@ function attachBusinessSearchTerms(
 
     return {
       ...bucket,
+      classification: bucket.classification ?? "ADVISORY_OR_REFERRAL_SOURCE",
+      eligibleProfiles: bucket.eligibleProfiles ?? ["FOR_PROFIT_SMALL_BUSINESS"],
+      fundingMechanism: bucket.fundingMechanism ?? "TECHNICAL_ASSISTANCE",
+      badgeLabel: bucket.badgeLabel ?? "Advisory / Referral",
+      eligibilityLabel:
+        bucket.eligibilityLabel ?? "Indiana for-profit small-business source; verify eligibility",
+      deadlineStatus:
+        bucket.deadlineStatus ?? "Verify current open, upcoming, rolling, or closed status before saving",
+      canAddVerifiedOpportunity: bucket.canAddVerifiedOpportunity ?? false,
+      researchActionLabel: bucket.researchActionLabel ?? "Verify Eligibility",
       sourceType: bucket.sourceType ?? "Technical assistance or advisory organization",
       verificationLabel: bucket.verificationLabel ?? "Manual verification required",
       recommendedSearchTerms: terms,
     };
-  });
+  }).sort(
+    (a, b) =>
+      (BUSINESS_SOURCE_PRIORITY[a.id] ?? 999) -
+      (BUSINESS_SOURCE_PRIORITY[b.id] ?? 999)
+  );
 }
 
 // ── Main Export ───────────────────────────────────────────────────────────────
@@ -1596,10 +1965,14 @@ function attachBusinessSearchTerms(
 export function generateFundingScout(org: OrgProfileSnapshot): FundingScoutReport {
   const kw = extractKeywords(org);
   const isBusiness = isBusinessProfile(org);
+  const eligibilityProfile = getOrgEligibilityProfile(org);
 
   if (isBusiness) {
     const strategies = buildBusinessStrategies(org, kw);
-    const sourceBuckets = attachBusinessSearchTerms(strategies, kw);
+    const sourceBuckets = filterSourcesForProfile(
+      attachBusinessSearchTerms(strategies, kw),
+      eligibilityProfile
+    );
     return {
       orgName: org.name,
       generatedAt: new Date(),
@@ -1617,7 +1990,10 @@ export function generateFundingScout(org: OrgProfileSnapshot): FundingScoutRepor
 
   // Nonprofit path (default)
   const strategies = buildNonprofitStrategies(org, kw);
-  const sourceBuckets = attachNonprofitSearchTerms(strategies, kw);
+  const sourceBuckets = filterSourcesForProfile(
+    attachNonprofitSearchTerms(strategies, kw),
+    eligibilityProfile
+  );
 
   return {
     orgName: org.name,
