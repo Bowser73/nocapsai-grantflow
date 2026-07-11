@@ -26,7 +26,7 @@ export const GRANT_STAGE_LABELS: Record<GrantWritingStage, string> = {
 };
 
 export function shouldWarnForProfitApplicant(input: {
-  eligibilityTag: GrantEligibilityTag | string;
+  eligibilityTag?: GrantEligibilityTag | string | null;
   applicantTypeRequired?: string | null;
   nocapsCanApplyDirectly?: boolean | null;
 }): boolean {

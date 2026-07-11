@@ -26,6 +26,67 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
+type GrantEligibilityLabelKey = keyof typeof GRANT_ELIGIBILITY_LABELS;
+type GrantStageLabelKey = keyof typeof GRANT_STAGE_LABELS;
+
+function getWorkflowString<K extends string>(
+  input: Partial<Record<K, unknown>>,
+  key: K
+): string | null {
+  if (key in input) {
+    const value = input[key];
+    return typeof value === "string" && value.trim() ? value : null;
+  }
+  return null;
+}
+
+function getWorkflowBoolean<K extends string>(
+  input: Partial<Record<K, unknown>>,
+  key: K
+): boolean | null {
+  if (key in input) {
+    const value = input[key];
+    return typeof value === "boolean" ? value : null;
+  }
+  return null;
+}
+
+function getGrantEligibilityTag(input: object): GrantEligibilityLabelKey | null {
+  if (!("eligibilityTag" in input)) return null;
+
+  switch (input.eligibilityTag) {
+    case "DIRECT_NOCAPSAI_ELIGIBLE":
+    case "PARTNER_OR_CLIENT_ELIGIBLE":
+    case "WATCHLIST_ONLY":
+    case "NOT_ELIGIBLE":
+      return input.eligibilityTag;
+    default:
+      return null;
+  }
+}
+
+function getGrantStage(input: object): GrantStageLabelKey | null {
+  if (!("applicationStatus" in input)) return null;
+
+  switch (input.applicationStatus) {
+    case "FOUND":
+    case "ELIGIBILITY_REVIEW":
+    case "DOCUMENTS_NEEDED":
+    case "DRAFTING":
+    case "BUDGET_DRAFT":
+    case "INTERNAL_REVIEW":
+    case "CLIENT_REVIEW":
+    case "READY_TO_SUBMIT":
+    case "SUBMITTED":
+    case "AWARDED":
+    case "REJECTED":
+    case "WATCHLIST":
+      return input.applicationStatus;
+    default:
+      return null;
+  }
+}
+
 export default async function GrantDetailPage({
   params,
 }: {
@@ -49,7 +110,26 @@ export default async function GrantDetailPage({
 
   const existingApp = grant.applications[0];
   const urgency = getDeadlineUrgency(grant.deadline);
-  const warnForProfitApplicant = shouldWarnForProfitApplicant(grant);
+  const workflow = {
+    eligibilityTag: getGrantEligibilityTag(grant),
+    applicationStatus: getGrantStage(grant),
+    applicantOrganization: getWorkflowString(grant, "applicantOrganization"),
+    applicantTypeRequired: getWorkflowString(grant, "applicantTypeRequired"),
+    nocapsCanApplyDirectly: getWorkflowBoolean(grant, "nocapsCanApplyDirectly"),
+    nocapsCanParticipateAsPartner: getWorkflowBoolean(grant, "nocapsCanParticipateAsPartner"),
+    partnerClientName: getWorkflowString(grant, "partnerClientName"),
+    fundingAmount: getWorkflowString(grant, "fundingAmount"),
+    matchRequirement: getWorkflowString(grant, "matchRequirement"),
+    samUeiRequirement: getWorkflowString(grant, "samUeiRequirement"),
+    nextAction: getWorkflowString(grant, "nextAction"),
+    eligibilityNotes: getWorkflowString(grant, "eligibilityNotes"),
+    riskNotes: getWorkflowString(grant, "riskNotes"),
+  };
+  const warnForProfitApplicant = shouldWarnForProfitApplicant({
+    eligibilityTag: workflow.eligibilityTag,
+    applicantTypeRequired: workflow.applicantTypeRequired,
+    nocapsCanApplyDirectly: workflow.nocapsCanApplyDirectly,
+  });
 
   // NoCapsAI / small-business fit evaluation (deterministic; no fabrication).
   // Only shown for business profiles; nonprofit profiles are unaffected.
@@ -256,45 +336,45 @@ export default async function GrantDetailPage({
           )}
           <div className="grid grid-cols-2 gap-x-6 gap-y-3">
             <EvalRow label="Eligibility tag">
-              {GRANT_ELIGIBILITY_LABELS[grant.eligibilityTag]}
+              {workflow.eligibilityTag ? GRANT_ELIGIBILITY_LABELS[workflow.eligibilityTag] : "Not tracked"}
             </EvalRow>
             <EvalRow label="Grant-writing stage">
-              {GRANT_STAGE_LABELS[grant.applicationStatus]}
+              {workflow.applicationStatus ? GRANT_STAGE_LABELS[workflow.applicationStatus] : "Not tracked"}
             </EvalRow>
             <EvalRow label="Applicant organization">
-              {grant.applicantOrganization || "Not assigned"}
+              {workflow.applicantOrganization || "Not assigned"}
             </EvalRow>
             <EvalRow label="Required applicant type">
-              {grant.applicantTypeRequired || "Not specified"}
+              {workflow.applicantTypeRequired || "Not specified"}
             </EvalRow>
             <EvalRow label="NoCapsAI can apply directly">
-              {grant.nocapsCanApplyDirectly == null ? "Unknown" : grant.nocapsCanApplyDirectly ? "Yes" : "No"}
+              {workflow.nocapsCanApplyDirectly == null ? "Unknown" : workflow.nocapsCanApplyDirectly ? "Yes" : "No"}
             </EvalRow>
             <EvalRow label="NoCapsAI partner/vendor role">
-              {grant.nocapsCanParticipateAsPartner ? "Yes" : "No / unknown"}
+              {workflow.nocapsCanParticipateAsPartner ? "Yes" : "No / unknown"}
             </EvalRow>
             <EvalRow label="Partner/client">
-              {grant.partnerClientName || "Not assigned"}
+              {workflow.partnerClientName || "Not assigned"}
             </EvalRow>
             <EvalRow label="Funding amount">
-              {grant.fundingAmount || (grant.awardMax ? formatCurrency(grant.awardMax) : "Not specified")}
+              {workflow.fundingAmount || (grant.awardMax ? formatCurrency(grant.awardMax) : "Not specified")}
             </EvalRow>
             <EvalRow label="Match requirement">
-              {grant.matchRequirement || "Not specified"}
+              {workflow.matchRequirement || "Not specified"}
             </EvalRow>
             <EvalRow label="SAM.gov / UEI requirement">
-              {grant.samUeiRequirement || "Not specified"}
+              {workflow.samUeiRequirement || "Not specified"}
             </EvalRow>
             <EvalRow label="Next action">
-              {grant.nextAction || "Not set"}
+              {workflow.nextAction || "Not set"}
             </EvalRow>
             <EvalRow label="Eligibility notes">
-              {grant.eligibilityNotes || "None"}
+              {workflow.eligibilityNotes || "None"}
             </EvalRow>
           </div>
-          {grant.riskNotes && (
+          {workflow.riskNotes && (
             <div className="mt-4 pt-4 border-t border-gray-100">
-              <EvalRow label="Risk notes">{grant.riskNotes}</EvalRow>
+              <EvalRow label="Risk notes">{workflow.riskNotes}</EvalRow>
             </div>
           )}
         </Card>
