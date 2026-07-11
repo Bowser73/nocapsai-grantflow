@@ -29,46 +29,40 @@ import Link from "next/link";
 type GrantEligibilityLabelKey = keyof typeof GRANT_ELIGIBILITY_LABELS;
 type GrantStageLabelKey = keyof typeof GRANT_STAGE_LABELS;
 
-function getWorkflowString<K extends string>(
-  input: Partial<Record<K, unknown>>,
-  key: K
-): string | null {
-  if (key in input) {
-    const value = input[key];
+function getWorkflowString(input: unknown, key: string): string | null {
+  if (typeof input === "object" && input !== null && key in input) {
+    const value = Object.entries(input).find(([entryKey]) => entryKey === key)?.[1];
     return typeof value === "string" && value.trim() ? value : null;
   }
   return null;
 }
 
-function getWorkflowBoolean<K extends string>(
-  input: Partial<Record<K, unknown>>,
-  key: K
-): boolean | null {
-  if (key in input) {
-    const value = input[key];
+function getWorkflowBoolean(input: unknown, key: string): boolean | null {
+  if (typeof input === "object" && input !== null && key in input) {
+    const value = Object.entries(input).find(([entryKey]) => entryKey === key)?.[1];
     return typeof value === "boolean" ? value : null;
   }
   return null;
 }
 
-function getGrantEligibilityTag(input: object): GrantEligibilityLabelKey | null {
-  if (!("eligibilityTag" in input)) return null;
+function getGrantEligibilityTag(input: unknown): GrantEligibilityLabelKey | null {
+  const eligibilityTag = getWorkflowString(input, "eligibilityTag");
 
-  switch (input.eligibilityTag) {
+  switch (eligibilityTag) {
     case "DIRECT_NOCAPSAI_ELIGIBLE":
     case "PARTNER_OR_CLIENT_ELIGIBLE":
     case "WATCHLIST_ONLY":
     case "NOT_ELIGIBLE":
-      return input.eligibilityTag;
+      return eligibilityTag;
     default:
       return null;
   }
 }
 
-function getGrantStage(input: object): GrantStageLabelKey | null {
-  if (!("applicationStatus" in input)) return null;
+function getGrantStage(input: unknown): GrantStageLabelKey | null {
+  const applicationStatus = getWorkflowString(input, "applicationStatus");
 
-  switch (input.applicationStatus) {
+  switch (applicationStatus) {
     case "FOUND":
     case "ELIGIBILITY_REVIEW":
     case "DOCUMENTS_NEEDED":
@@ -81,7 +75,7 @@ function getGrantStage(input: object): GrantStageLabelKey | null {
     case "AWARDED":
     case "REJECTED":
     case "WATCHLIST":
-      return input.applicationStatus;
+      return applicationStatus;
     default:
       return null;
   }
