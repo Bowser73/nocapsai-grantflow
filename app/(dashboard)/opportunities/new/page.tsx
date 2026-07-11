@@ -7,14 +7,59 @@ import {
 } from "@/components/opportunities/manual-opportunity-form";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import type { GrantEligibilityTag, GrantWritingStage } from "@prisma/client";
 
 export const metadata = { title: "Add Manual Opportunity" };
+
+const ELIGIBILITY_TAGS = new Set<string>([
+  "DIRECT_NOCAPSAI_ELIGIBLE",
+  "PARTNER_OR_CLIENT_ELIGIBLE",
+  "WATCHLIST_ONLY",
+  "NOT_ELIGIBLE",
+]);
+
+const WRITING_STAGES = new Set<string>([
+  "FOUND",
+  "ELIGIBILITY_REVIEW",
+  "DOCUMENTS_NEEDED",
+  "DRAFTING",
+  "BUDGET_DRAFT",
+  "INTERNAL_REVIEW",
+  "CLIENT_REVIEW",
+  "READY_TO_SUBMIT",
+  "SUBMITTED",
+  "AWARDED",
+  "REJECTED",
+  "WATCHLIST",
+]);
+
+const CURRENT_LOCAL_RESEARCH_LANE_TITLE =
+  "Local Funding Research Lane: Rush County and Rural Indiana";
+
+function normalizeSourceName(value?: string): string | undefined {
+  if (
+    value?.includes("Rush County") &&
+    value.includes("Rural Indiana") &&
+    value.includes("Digital Transformation")
+  ) {
+    return CURRENT_LOCAL_RESEARCH_LANE_TITLE;
+  }
+  return value ?? undefined;
+}
+
+function parseEligibilityTag(value?: string): GrantEligibilityTag | undefined {
+  return value && ELIGIBILITY_TAGS.has(value) ? (value as GrantEligibilityTag) : undefined;
+}
+
+function parseWritingStage(value?: string): GrantWritingStage | undefined {
+  return value && WRITING_STAGES.has(value) ? (value as GrantWritingStage) : undefined;
+}
 
 /**
  * Manual opportunity intake page.
  *
  * Accepts optional query params from Funding Scout source cards:
- *   ?sourceName=...&sourceUrl=...&categoryLabel=...&fitReason=...&searchTerm=...
+ *   ?sourceName=...&sourceUrl=...&categoryLabel=...&fitReason=...&searchTerm=...&sourceClassification=...
  *
  * All query params are used only for pre-filling — the user must
  * verify and complete all required fields before saving.
@@ -28,17 +73,41 @@ export default async function NewOpportunityPage({
     categoryLabel?: string;
     fitReason?: string;
     searchTerm?: string;
+    eligibilityTag?: string;
+    applicationStatus?: string;
+    applicantOrganization?: string;
+    applicantTypeRequired?: string;
+    nocapsCanApplyDirectly?: string;
+    nocapsCanParticipateAsPartner?: string;
+    partnerClientName?: string;
+    nextAction?: string;
+    riskNotes?: string;
+    eligibilityNotes?: string;
+    sourceClassification?: string;
+    sourceIsVerifiedOpportunity?: string;
   };
 }) {
   const session = await auth();
   if (!session?.user) redirect("/auth/login");
 
   const prefill: ManualOpportunityPrefill = {
-    sourceName:    searchParams.sourceName    ?? undefined,
+    sourceName:    normalizeSourceName(searchParams.sourceName),
     sourceUrl:     searchParams.sourceUrl     ?? undefined,
     categoryLabel: searchParams.categoryLabel ?? undefined,
     fitReason:     searchParams.fitReason     ?? undefined,
     searchTerm:    searchParams.searchTerm    ?? undefined,
+    eligibilityTag: parseEligibilityTag(searchParams.eligibilityTag),
+    applicationStatus: parseWritingStage(searchParams.applicationStatus),
+    applicantOrganization: searchParams.applicantOrganization ?? undefined,
+    applicantTypeRequired: searchParams.applicantTypeRequired ?? undefined,
+    nocapsCanApplyDirectly: searchParams.nocapsCanApplyDirectly ?? undefined,
+    nocapsCanParticipateAsPartner: searchParams.nocapsCanParticipateAsPartner ?? undefined,
+    partnerClientName: searchParams.partnerClientName ?? undefined,
+    nextAction: searchParams.nextAction ?? undefined,
+    riskNotes: searchParams.riskNotes ?? undefined,
+    eligibilityNotes: searchParams.eligibilityNotes ?? undefined,
+    sourceClassification: searchParams.sourceClassification ?? undefined,
+    sourceIsVerifiedOpportunity: searchParams.sourceIsVerifiedOpportunity === "true",
   };
 
   return (

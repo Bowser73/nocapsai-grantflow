@@ -47,6 +47,8 @@ function buildNewOpportunityUrl(params: {
   sourceName: string;
   sourceUrl:  string;
   categoryLabel: string;
+  sourceClassification?: string;
+  sourceIsVerifiedOpportunity?: boolean;
   fitReason:  string;
   searchTerm?: string;
   eligibilityTag?: string;
@@ -65,6 +67,10 @@ function buildNewOpportunityUrl(params: {
   qs.set("sourceUrl",     params.sourceUrl);
   qs.set("categoryLabel", params.categoryLabel);
   qs.set("fitReason",     params.fitReason);
+  if (params.sourceClassification) qs.set("sourceClassification", params.sourceClassification);
+  if (params.sourceIsVerifiedOpportunity != null) {
+    qs.set("sourceIsVerifiedOpportunity", String(params.sourceIsVerifiedOpportunity));
+  }
   if (params.searchTerm) qs.set("searchTerm", params.searchTerm);
   if (params.eligibilityTag) qs.set("eligibilityTag", params.eligibilityTag);
   if (params.applicationStatus) qs.set("applicationStatus", params.applicationStatus);
@@ -303,6 +309,8 @@ function getMoveUrl(report: FundingScoutReport, move: RecommendedMove): string {
     sourceName: source?.name ?? move.title,
     sourceUrl: source?.url ?? "https://example.com/verify-source-first",
     categoryLabel: meta?.label ?? move.lane,
+    sourceClassification: source?.badgeLabel,
+    sourceIsVerifiedOpportunity: source?.canAddVerifiedOpportunity ?? false,
     fitReason: `${move.why} ${move.nextAction}`,
     searchTerm: source?.recommendedSearchTerms[0],
     eligibilityTag,
@@ -601,6 +609,8 @@ export function FundingScoutView({ org }: FundingScoutViewProps) {
                   sourceName:    bucket.name,
                   sourceUrl:     bucket.url,
                   categoryLabel: meta.label,
+                  sourceClassification: bucket.badgeLabel,
+                  sourceIsVerifiedOpportunity: bucket.canAddVerifiedOpportunity,
                   fitReason:     bucket.fitReason,
                   searchTerm:    bucket.recommendedSearchTerms[0],
                 });

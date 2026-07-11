@@ -1580,19 +1580,19 @@ function buildBusinessStrategies(
       term: "Indiana rural small business digital transformation funding",
       priority: "high",
       categoryLabel: "Rural Digital Transformation",
-      suggestedSources: ["Rush County / Rural Indiana Digital Transformation", "Indiana SBDC", "IEDC"],
+      suggestedSources: ["Local Funding Research Lane: Rush County and Rural Indiana", "Indiana SBDC", "IEDC"],
     },
     {
       term: "small business technology adoption program Indiana",
       priority: "high",
       categoryLabel: "Technology Adoption",
-      suggestedSources: ["Rush County / Rural Indiana Digital Transformation", "IEDC", "Indiana SBDC"],
+      suggestedSources: ["Local Funding Research Lane: Rush County and Rural Indiana", "IEDC", "Indiana SBDC"],
     },
     {
       term: "rural business automation funding",
       priority: "high",
       categoryLabel: "Rural Automation",
-      suggestedSources: ["Rush County / Rural Indiana Digital Transformation", "Indiana SBDC"],
+      suggestedSources: ["Local Funding Research Lane: Rush County and Rural Indiana", "Indiana SBDC"],
     },
     {
       term: "Indiana AI startup accelerator",
