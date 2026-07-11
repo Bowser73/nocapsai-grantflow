@@ -1,7 +1,31 @@
-import type { GrantEligibilityTag, GrantWritingStage } from "@prisma/client";
-
 export const FOR_PROFIT_APPLICANT_WARNING =
   "This opportunity may still be useful, but NoCapsAI should not be listed as the applicant unless the funder allows for-profit entities. Consider assigning this to an eligible partner or client.";
+
+export const GRANT_ELIGIBILITY_VALUES = [
+  "DIRECT_NOCAPSAI_ELIGIBLE",
+  "PARTNER_OR_CLIENT_ELIGIBLE",
+  "WATCHLIST_ONLY",
+  "NOT_ELIGIBLE",
+] as const;
+
+export type GrantEligibilityTag = (typeof GRANT_ELIGIBILITY_VALUES)[number];
+
+export const GRANT_STAGE_VALUES = [
+  "FOUND",
+  "ELIGIBILITY_REVIEW",
+  "DOCUMENTS_NEEDED",
+  "DRAFTING",
+  "BUDGET_DRAFT",
+  "INTERNAL_REVIEW",
+  "CLIENT_REVIEW",
+  "READY_TO_SUBMIT",
+  "SUBMITTED",
+  "AWARDED",
+  "REJECTED",
+  "WATCHLIST",
+] as const;
+
+export type GrantWritingStage = (typeof GRANT_STAGE_VALUES)[number];
 
 export const GRANT_ELIGIBILITY_LABELS: Record<GrantEligibilityTag, string> = {
   DIRECT_NOCAPSAI_ELIGIBLE: "Direct NoCapsAI eligible",

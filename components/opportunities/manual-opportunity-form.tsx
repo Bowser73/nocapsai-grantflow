@@ -15,10 +15,13 @@ import {
 import {
   FOR_PROFIT_APPLICANT_WARNING,
   GRANT_ELIGIBILITY_LABELS,
+  GRANT_ELIGIBILITY_VALUES,
   GRANT_STAGE_LABELS,
+  GRANT_STAGE_VALUES,
   shouldWarnForProfitApplicant,
+  type GrantEligibilityTag,
+  type GrantWritingStage,
 } from "@/lib/grant-workflows";
-import type { GrantEligibilityTag, GrantWritingStage } from "@prisma/client";
 
 // ── Pre-fill context passed from Funding Scout ───────────────────────────────
 
@@ -59,14 +62,14 @@ const CATEGORY_OPTIONS = [
   { value: "Other",                label: "Other" },
 ];
 
-const ELIGIBILITY_OPTIONS = Object.entries(GRANT_ELIGIBILITY_LABELS).map(([value, label]) => ({
+const ELIGIBILITY_OPTIONS = GRANT_ELIGIBILITY_VALUES.map((value) => ({
   value,
-  label,
+  label: GRANT_ELIGIBILITY_LABELS[value],
 }));
 
-const STAGE_OPTIONS = Object.entries(GRANT_STAGE_LABELS).map(([value, label]) => ({
+const STAGE_OPTIONS = GRANT_STAGE_VALUES.map((value) => ({
   value,
-  label,
+  label: GRANT_STAGE_LABELS[value],
 }));
 
 // ── Form state type ───────────────────────────────────────────────────────────
@@ -535,14 +538,20 @@ export function ManualOpportunityForm({ prefill }: Props) {
               label="Eligibility lane"
               options={ELIGIBILITY_OPTIONS}
               value={form.eligibilityTag}
-              onChange={(e) => update("eligibilityTag", e.target.value as GrantEligibilityTag)}
+              onChange={(e) => {
+                const value = ELIGIBILITY_OPTIONS.find((option) => option.value === e.target.value)?.value;
+                if (value) update("eligibilityTag", value);
+              }}
               hint="Keeps direct NoCapsAI grants separate from partner/client leads."
             />
             <Select
               label="Grant-writing stage"
               options={STAGE_OPTIONS}
               value={form.applicationStatus}
-              onChange={(e) => update("applicationStatus", e.target.value as GrantWritingStage)}
+              onChange={(e) => {
+                const value = STAGE_OPTIONS.find((option) => option.value === e.target.value)?.value;
+                if (value) update("applicationStatus", value);
+              }}
             />
           </div>
           <div className="grid grid-cols-2 gap-4">

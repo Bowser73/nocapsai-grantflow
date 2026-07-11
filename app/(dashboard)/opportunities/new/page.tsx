@@ -7,18 +7,37 @@ import {
 } from "@/components/opportunities/manual-opportunity-form";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import type { GrantEligibilityTag, GrantWritingStage } from "@prisma/client";
 
 export const metadata = { title: "Add Manual Opportunity" };
 
-const ELIGIBILITY_TAGS = new Set<string>([
+type GrantEligibilityTag =
+  | "DIRECT_NOCAPSAI_ELIGIBLE"
+  | "PARTNER_OR_CLIENT_ELIGIBLE"
+  | "WATCHLIST_ONLY"
+  | "NOT_ELIGIBLE";
+
+type GrantWritingStage =
+  | "FOUND"
+  | "ELIGIBILITY_REVIEW"
+  | "DOCUMENTS_NEEDED"
+  | "DRAFTING"
+  | "BUDGET_DRAFT"
+  | "INTERNAL_REVIEW"
+  | "CLIENT_REVIEW"
+  | "READY_TO_SUBMIT"
+  | "SUBMITTED"
+  | "AWARDED"
+  | "REJECTED"
+  | "WATCHLIST";
+
+const ELIGIBILITY_TAGS: readonly GrantEligibilityTag[] = [
   "DIRECT_NOCAPSAI_ELIGIBLE",
   "PARTNER_OR_CLIENT_ELIGIBLE",
   "WATCHLIST_ONLY",
   "NOT_ELIGIBLE",
-]);
+];
 
-const WRITING_STAGES = new Set<string>([
+const WRITING_STAGES: readonly GrantWritingStage[] = [
   "FOUND",
   "ELIGIBILITY_REVIEW",
   "DOCUMENTS_NEEDED",
@@ -31,7 +50,7 @@ const WRITING_STAGES = new Set<string>([
   "AWARDED",
   "REJECTED",
   "WATCHLIST",
-]);
+];
 
 const CURRENT_LOCAL_RESEARCH_LANE_TITLE =
   "Local Funding Research Lane: Rush County and Rural Indiana";
@@ -48,11 +67,11 @@ function normalizeSourceName(value?: string): string | undefined {
 }
 
 function parseEligibilityTag(value?: string): GrantEligibilityTag | undefined {
-  return value && ELIGIBILITY_TAGS.has(value) ? (value as GrantEligibilityTag) : undefined;
+  return ELIGIBILITY_TAGS.find((tag) => tag === value);
 }
 
 function parseWritingStage(value?: string): GrantWritingStage | undefined {
-  return value && WRITING_STAGES.has(value) ? (value as GrantWritingStage) : undefined;
+  return WRITING_STAGES.find((stage) => stage === value);
 }
 
 /**
