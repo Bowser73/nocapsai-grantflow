@@ -26,17 +26,25 @@ function LoginForm() {
 
     // Normalize email to match how it is stored/looked up server-side
     // (the authorize callback trims + lowercases before the DB lookup).
-    const result = await signIn("credentials", {
-      email: email.trim().toLowerCase(),
-      password,
-      redirect: false,
-    });
+    try {
+      const result = await signIn("credentials", {
+        email: email.trim().toLowerCase(),
+        password,
+        redirect: false,
+      });
 
-    if (result?.error) {
-      setError("Invalid email or password.");
+      if (result?.error === "CredentialsSignin") {
+        setError("Invalid email or password.");
+      } else if (!result || result.error || !result.ok) {
+        setError("Sign-in is temporarily unavailable. Please try again shortly.");
+      } else {
+        router.push(callbackUrl);
+        router.refresh();
+      }
+    } catch {
+      setError("Unable to reach the sign-in service. Check your connection and try again.");
+    } finally {
       setLoading(false);
-    } else {
-      router.push(callbackUrl);
     }
   }
 

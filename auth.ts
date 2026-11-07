@@ -57,9 +57,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
 
         try {
-          const user = await prisma.user.findUnique({
+          let user = await prisma.user.findUnique({
             where: { email: normalizedEmail },
           });
+          // Older registrations preserved email case. Only accept an unambiguous
+          // legacy match; never choose between multiple accounts arbitrarily.
+          if (!user) {
+            const matches = await prisma.user.findMany({
+              where: { email: { equals: normalizedEmail, mode: "insensitive" } },
+              take: 2,
+            });
+            if (matches.length === 1) user = matches[0];
+          }
 
           console.error("[auth][authorize] user found:", !!user);
           if (!user) return null;
@@ -85,7 +94,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         } catch (err) {
           // Surfaces real causes (e.g. DB unreachable, missing DATABASE_URL,
           // tables not migrated) in server logs WITHOUT exposing credentials or
-          // secrets. The user still sees a generic "Invalid email or password".
+          // secrets. Infrastructure failures must not look like bad credentials.
           console.error(
             "[auth][authorize] threw:",
             err instanceof Error ? `${err.name}: ${err.message}` : String(err)
@@ -93,7 +102,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           if (err instanceof Error && err.stack) {
             console.error("[auth][authorize] stack:", err.stack);
           }
-          return null;
+          throw new Error("Sign-in service unavailable");
         }
       },
     }),
