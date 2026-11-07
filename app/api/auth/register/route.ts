@@ -5,7 +5,7 @@ import { z } from "zod";
 
 const schema = z.object({
   name: z.string().min(2).max(80),
-  email: z.string().email(),
+  email: z.string().trim().toLowerCase().email(),
   password: z.string().min(8).max(128),
 });
 
@@ -14,7 +14,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { name, email, password } = schema.parse(body);
 
-    const existing = await prisma.user.findUnique({ where: { email } });
+    const existing = await prisma.user.findFirst({
+      where: { email: { equals: email, mode: "insensitive" } },
+    });
     if (existing) {
       return NextResponse.json({ error: "An account with this email already exists." }, { status: 409 });
     }
