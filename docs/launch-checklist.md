@@ -2,15 +2,18 @@
 
 Everything below is optional except step 1. Each feature stays switched off, and the app keeps working, until its settings are added in Vercel (Project → Settings → Environment Variables).
 
-## 1. Database (required, do this before deploying the code)
+## 1. Database (automatic)
 
-Run both new migrations against the production database:
+Nothing to do. The deployment applies the schema changes itself: `npm run build` runs
+`scripts/deploy-migrate.ts` before building, which applies the two new migration files.
 
-```
-npx prisma migrate deploy
-```
+Every statement in those files is guarded (`IF NOT EXISTS`, or a `WHERE` clause), so
+running them again changes nothing, and they only add columns, tables and indexes —
+no existing data is dropped or rewritten. If the database cannot be reached the build
+fails, which leaves the previous version serving rather than publishing code that would
+error.
 
-They only add things (new columns and two new tables), so the currently deployed version keeps working after they run. Accounts that already exist are marked `COMP` (full access, never billed).
+Accounts that existed before billing launched are marked `COMP`: full access, never billed.
 
 ## 2. Scheduled jobs
 
