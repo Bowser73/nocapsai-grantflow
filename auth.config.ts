@@ -53,6 +53,9 @@ export const authConfig = {
         return true;
       }
 
+      // The public landing page
+      if (nextUrl.pathname === "/") return true;
+
       // Require login for everything else
       if (!isLoggedIn) return false;
 

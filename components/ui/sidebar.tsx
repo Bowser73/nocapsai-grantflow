@@ -13,12 +13,12 @@ import {
   FileText,
   Settings,
   ChevronRight,
-  Sparkles,
   LogOut,
   Bell,
   Landmark,
 } from "lucide-react";
 import { ProfileSwitcher } from "@/components/ui/profile-switcher";
+import { Logo } from "@/components/brand/logo";
 import type { OrgSummary } from "@/lib/user-orgs";
 
 const navItems = [
@@ -88,14 +88,11 @@ export function Sidebar({ orgs, activeOrgId, orgName, unreadNotifications = 0 }:
   const showSwitcher = orgs && orgs.length > 0;
 
   return (
-    <aside className="w-60 shrink-0 flex flex-col bg-gradient-to-b from-brand-700 to-brand-800 h-screen sticky top-0">
+    <aside className="w-60 shrink-0 flex flex-col bg-brand-800 h-screen sticky top-0">
       {/* Logo */}
       <div className="h-14 flex items-center px-5 border-b border-white/10">
-        <Link href="/dashboard" className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-md bg-white/20 flex items-center justify-center">
-            <Sparkles className="w-4 h-4 text-white" />
-          </div>
-          <span className="font-bold text-white text-[15px]">GrantFlow AI</span>
+        <Link href="/dashboard" aria-label="GrantFlow dashboard">
+          <Logo tone="light" />
         </Link>
       </div>
 
@@ -136,7 +133,7 @@ export function Sidebar({ orgs, activeOrgId, orgName, unreadNotifications = 0 }:
               className={cn(
                 "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium mb-0.5 group transition-colors",
                 isActive
-                  ? "bg-white/20 text-white"
+                  ? "bg-white/10 text-white shadow-[inset_3px_0_0_0_#FFE04A]"
                   : "text-brand-200 hover:bg-white/10 hover:text-white"
               )}
             >
@@ -149,7 +146,7 @@ export function Sidebar({ orgs, activeOrgId, orgName, unreadNotifications = 0 }:
               />
               <span className="flex-1">{item.label}</span>
               {item.href === "/notifications" && unreadNotifications > 0 && (
-                <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-amber-400 text-[11px] font-bold text-gray-900 flex items-center justify-center">
+                <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-highlight text-[11px] font-bold text-brand-900 flex items-center justify-center">
                   {unreadNotifications > 99 ? "99+" : unreadNotifications}
                 </span>
               )}
