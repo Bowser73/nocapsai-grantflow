@@ -38,11 +38,23 @@ export const authConfig = {
       // Always allow auth API routes
       if (isApiAuthRoute) return true;
 
+      // Machine-to-machine endpoints that verify their own secret/signature
+      // instead of a login session (Vercel Cron, Stripe webhooks).
+      if (
+        nextUrl.pathname.startsWith("/api/cron/") ||
+        nextUrl.pathname === "/api/billing/webhook"
+      ) {
+        return true;
+      }
+
       // Redirect logged-in users away from auth pages
       if (isAuthPage) {
         if (isLoggedIn) return Response.redirect(new URL("/dashboard", nextUrl));
         return true;
       }
+
+      // The public landing page
+      if (nextUrl.pathname === "/") return true;
 
       // Require login for everything else
       if (!isLoggedIn) return false;

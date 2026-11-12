@@ -8,6 +8,7 @@ import { auth } from "@/auth";
 import prisma from "@/lib/db/prisma";
 import { runWriterAgent } from "@/lib/agents/writer-agent";
 import type { GrantSectionType } from "@/types";
+import { canWriteSections } from "@/lib/billing/entitlements";
 
 export async function POST(
   req: NextRequest,
@@ -34,6 +35,11 @@ export async function POST(
   }
   if (section.isLocked) {
     return NextResponse.json({ error: "Section is locked and cannot be regenerated" }, { status: 409 });
+  }
+
+  const limit = await canWriteSections(session.user.id, session.user.organizationId, 1);
+  if (!limit.allowed) {
+    return NextResponse.json({ error: limit.message, limit: limit.kind }, { status: 402 });
   }
 
   try {

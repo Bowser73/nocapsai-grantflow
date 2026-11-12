@@ -163,6 +163,17 @@ model User {
 
   role          UserRole  @default(WRITER)
 
+  // Email reminders (deadlines, follow-ups). Users can turn these off in Settings.
+  emailReminders Boolean  @default(true)
+
+  // Billing. plan: "FREE" | "PRO" | "COMP" (complimentary full access).
+  // The Stripe fields are only set once a user starts a subscription.
+  plan                 String    @default("FREE")
+  stripeCustomerId     String?   @unique
+  stripeSubscriptionId String?   @unique
+  subscriptionStatus   String?   // Stripe status: "active", "trialing", "past_due", "canceled", ...
+  currentPeriodEnd     DateTime?
+
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id])
 
@@ -284,7 +295,7 @@ model OrganizationDocument {
   type           DocumentType
   name           String         // Display name
   fileName       String         // Original file name
-  fileUrl        String         // Storage URL (local path in dev, S3 in prod)
+  fileUrl        String         // Download URL: /api/organizations/documents/<id>/file
   fileSize       Int            // Bytes
   mimeType       String
 
@@ -292,11 +303,23 @@ model OrganizationDocument {
   expiresAt      DateTime?      // For time-sensitive docs (audit, financials)
   description    String?
 
+  // File contents (stored in the database so uploads survive serverless deploys)
+  blob           DocumentBlob?
+
   // Which grant applications reference this doc
   applications   GrantApplication[] @relation("ApplicationDocuments")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// File bytes live in their own table so listing documents never loads file contents.
+model DocumentBlob {
+  documentId String               @id
+  document   OrganizationDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  data       Bytes
+
+  createdAt DateTime @default(now())
 }
 
 // -----------------------------------------------------------------------------
@@ -334,6 +357,38 @@ model GrantSearchQuery {
   agentRunId     String?
 
   createdAt DateTime @default(now())
+}
+
+// -----------------------------------------------------------------------------
+// FOUNDATIONS (public IRS data)
+// One row per grantmaking organization from the IRS Exempt Organizations
+// Business Master File. Refreshed by lib/foundations/import.ts.
+// -----------------------------------------------------------------------------
+
+model Foundation {
+  ein            String   @id      // 9 digits, no dash
+  name           String
+  careOf         String?
+  street         String?
+  city           String?
+  state          String?
+  zip            String?
+
+  kind           String             // PRIVATE_FOUNDATION | PRIVATE_OPERATING | COMMUNITY_FOUNDATION | GRANTMAKING_CHARITY
+  foundationCode String?            // IRS foundation code ("04" = private non-operating foundation)
+  nteeCode       String?
+  rulingYear     Int?               // year the IRS recognized the exemption
+  taxPeriod      String?            // YYYYMM of the latest return on file
+
+  // Dollar amounts from the latest return. BigInt: the largest exceed 2^31.
+  assets         BigInt?
+  income         BigInt?
+  revenue        BigInt?
+
+  sourceUpdatedAt DateTime          // when this row was last refreshed from the IRS file
+
+  @@index([state, assets])
+  @@index([name])
 }
 
 // -----------------------------------------------------------------------------
@@ -719,6 +774,17 @@ model Notification {
   applicationId  String?
   opportunityId  String?
 
+  // Set for automatic reminders so the same reminder is never sent twice,
+  // e.g. "deadline:<applicationId>:<userId>:7d:2026-12-01"
+  dedupeKey      String?  @unique
+
+  // True while a reminder email for this notification is still owed. Kept in the
+  // database so an interrupted run is picked up by the next one.
+  emailPending   Boolean  @default(false)
+
   createdAt DateTime @default(now())
+
+  @@index([userId, isRead])
+  @@index([emailPending])
 }
 

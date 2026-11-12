@@ -5,6 +5,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import prisma from "@/lib/db/prisma";
+import { canWriteSections } from "@/lib/billing/entitlements";
+import { GRANT_SECTION_ORDER } from "@/types";
 import { runWriterAgentAllSections } from "@/lib/agents/writer-agent";
 
 // This route uses Prisma, the OpenAI client, and env-dependent logic at request
@@ -46,6 +48,15 @@ export async function POST(req: NextRequest) {
   });
   if (!ownedApp) {
     return NextResponse.json({ error: "Application not found" }, { status: 404 });
+  }
+
+  const limit = await canWriteSections(
+    session.user.id,
+    session.user.organizationId,
+    GRANT_SECTION_ORDER.length
+  );
+  if (!limit.allowed) {
+    return NextResponse.redirect(new URL("/settings?limit=aiDrafts", req.url), 303);
   }
 
   // Run all writer agent sections

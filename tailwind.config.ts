@@ -12,18 +12,26 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // GrantFlow brand palette — professional, trustworthy
+        // GrantFlow palette — the paperwork itself.
+        // brand = ledger ink (the blue-black of a filled-in form).
         brand: {
-          50:  "#eef2ff",
-          100: "#e0e7ff",
-          200: "#c7d2fe",
-          300: "#a5b4fc",
-          400: "#818cf8",
-          500: "#6366f1",
-          600: "#4f46e5",
-          700: "#4338ca",
-          800: "#3730a3",
-          900: "#312e81",
+          50:  "#F2F5FA",
+          100: "#E3EAF4",
+          200: "#C9D6EA",
+          300: "#9DB2D3",
+          400: "#6A85B4",
+          500: "#3F5E96",
+          600: "#233F74",
+          700: "#182E58",
+          800: "#14213D",
+          900: "#0C1630",
+        },
+        paper: "#FAFBF7",        // form stock (a cool white, not cream)
+        rule: "#C9D6EA",         // ruled lines on a form
+        highlight: "#FFE04A",    // highlighter: marks anything not yet verified
+        stamp: {
+          green: "#1E7B4F",      // approved / ready
+          red: "#C2372B",        // due / overdue
         },
         success: {
           50:  "#f0fdf4",
@@ -42,7 +50,9 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
+        sans: ["var(--font-sans)", "system-ui", "sans-serif"],
+        display: ["var(--font-display)", "var(--font-sans)", "system-ui", "sans-serif"],
+        type: ["var(--font-type)", "ui-monospace", "monospace"],
       },
       borderRadius: {
         lg: "0.625rem",
