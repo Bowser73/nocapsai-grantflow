@@ -50,13 +50,14 @@ export async function POST(req: NextRequest) {
         ...orgData,
         orgType: data.orgType as never,
         profileCompleteness,
-        users: { connect: { id: data.userId } },
+        createdByUserId: session.user.id,
+        users: { connect: { id: session.user.id } },
       },
     });
 
-    // Link user to org
+    // Link the signed-in user to the org (never a userId from the request body)
     await prisma.user.update({
-      where: { id: data.userId },
+      where: { id: session.user.id },
       data: { organizationId: org.id },
     });
 

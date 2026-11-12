@@ -1,6 +1,6 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
-import prisma from "@/lib/db/prisma";
+import { getUserOrgs } from "@/lib/user-orgs";
 import { Topbar } from "@/components/ui/topbar";
 import { OrgLinker } from "@/components/onboarding/org-linker";
 import { Building2, Plus } from "lucide-react";
@@ -18,11 +18,13 @@ export default async function OnboardingPage() {
     redirect("/dashboard");
   }
 
-  // Load all organizations in the system so the user can select one
-  const allOrgs = await prisma.organization.findMany({
-    select: { id: true, name: true, orgType: true, city: true, state: true },
-    orderBy: { name: "asc" },
-  });
+  // Only organizations this user created or was added to. Never list other
+  // people's organizations here.
+  const allOrgs = (await getUserOrgs(session.user.id)).map((o) => ({
+    ...o,
+    city: null,
+    state: null,
+  }));
 
   return (
     <div>
@@ -36,7 +38,8 @@ export default async function OnboardingPage() {
             Connect your organization
           </h1>
           <p className="text-sm text-gray-500 mt-2 max-w-sm mx-auto">
-            Link your account to an existing organization or create a new one to get started.
+            Create your organization profile to get started. If someone else already set up
+            your organization, ask them to add you instead of creating a second copy.
           </p>
         </div>
 
@@ -44,7 +47,7 @@ export default async function OnboardingPage() {
           /* No orgs exist yet — direct to profile creation */
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 text-center">
             <p className="text-sm text-gray-600 mb-4">
-              No organizations exist yet. Create your organization profile to get started.
+              Create your organization profile to get started.
             </p>
             <Link href="/profile">
               <Button icon={<Plus size={15} />}>Create Organization Profile</Button>

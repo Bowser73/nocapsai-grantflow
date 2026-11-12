@@ -47,6 +47,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
     }
 
+    // Documents can only be added to the caller's active organization.
+    if (organizationId !== session.user.organizationId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     // Dev: write to public/uploads — replace with S3 in prod
     const uploadDir = path.join(process.cwd(), "public", "uploads", organizationId);
     await mkdir(uploadDir, { recursive: true });
