@@ -360,6 +360,38 @@ model GrantSearchQuery {
 }
 
 // -----------------------------------------------------------------------------
+// FOUNDATIONS (public IRS data)
+// One row per grantmaking organization from the IRS Exempt Organizations
+// Business Master File. Refreshed by lib/foundations/import.ts.
+// -----------------------------------------------------------------------------
+
+model Foundation {
+  ein            String   @id      // 9 digits, no dash
+  name           String
+  careOf         String?
+  street         String?
+  city           String?
+  state          String?
+  zip            String?
+
+  kind           String             // PRIVATE_FOUNDATION | PRIVATE_OPERATING | COMMUNITY_FOUNDATION | GRANTMAKING_CHARITY
+  foundationCode String?            // IRS foundation code ("04" = private non-operating foundation)
+  nteeCode       String?
+  rulingYear     Int?               // year the IRS recognized the exemption
+  taxPeriod      String?            // YYYYMM of the latest return on file
+
+  // Dollar amounts from the latest return. BigInt: the largest exceed 2^31.
+  assets         BigInt?
+  income         BigInt?
+  revenue        BigInt?
+
+  sourceUpdatedAt DateTime          // when this row was last refreshed from the IRS file
+
+  @@index([state, assets])
+  @@index([name])
+}
+
+// -----------------------------------------------------------------------------
 // GRANT OPPORTUNITY
 // -----------------------------------------------------------------------------
 

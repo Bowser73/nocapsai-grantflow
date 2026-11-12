@@ -11,6 +11,10 @@ import { BillingPanel } from "@/components/settings/billing-panel";
 import { entitlementsFor } from "@/lib/billing/entitlements";
 import { PLAN_LIMITS, PRO_PRICE_LABEL } from "@/lib/billing/plans";
 import { formatDate } from "@/lib/utils";
+import { FoundationImportPanel } from "@/components/foundations/import-panel";
+import { configuredStates, isAdminEmail } from "@/lib/foundations/import";
+import { loadedStates } from "@/lib/foundations/search";
+import { US_STATES } from "@/lib/foundations/bmf";
 
 const LIMIT_NOTICES: Record<string, string> = {
   applications: `The Free plan includes ${PLAN_LIMITS.FREE.applications} applications per organization. Upgrade to Pro (${PRO_PRICE_LABEL}) to start another.`,
@@ -41,6 +45,8 @@ export default async function SettingsPage({
   });
   if (!dbUser) redirect("/auth/login");
 
+  const isAdmin = isAdminEmail(dbUser.email);
+  const foundationStates = isAdmin ? await loadedStates() : [];
   const entitlements = await entitlementsFor(session.user.id, session.user.organizationId);
   const notice =
     searchParams?.billing === "success"
@@ -83,6 +89,22 @@ export default async function SettingsPage({
             notice={notice}
           />
         </Card>
+
+        {/* Foundation data (site administrators only) */}
+        {isAdmin && (
+          <Card>
+            <CardTitle className="mb-3">Foundation data</CardTitle>
+            <FoundationImportPanel
+              states={Object.entries(US_STATES).map(([code, name]) => ({ code, name }))}
+              loaded={foundationStates.map((s) => ({
+                state: s.state,
+                count: s.count,
+                refreshed: s.refreshedAt ? formatDate(s.refreshedAt) : null,
+              }))}
+              defaultState={configuredStates()[0]}
+            />
+          </Card>
+        )}
 
         {/* API Keys */}
         <Card>

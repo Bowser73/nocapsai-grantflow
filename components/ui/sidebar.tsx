@@ -16,6 +16,7 @@ import {
   Sparkles,
   LogOut,
   Bell,
+  Landmark,
 } from "lucide-react";
 import { ProfileSwitcher } from "@/components/ui/profile-switcher";
 import type { OrgSummary } from "@/lib/user-orgs";
@@ -40,6 +41,11 @@ const navItems = [
     label: "Funding Scout",
     href: "/funding-scout",
     icon: Radar,
+  },
+  {
+    label: "Foundation Finder",
+    href: "/foundations",
+    icon: Landmark,
   },
   {
     label: "Applications",
