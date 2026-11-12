@@ -1,6 +1,6 @@
 # GrantFlow launch checklist
 
-Everything below is optional except step 1. Each feature stays switched off, and the app keeps working, until its settings are added in Vercel (Project → Settings → Environment Variables).
+Everything below is optional. Each feature stays switched off, and the app keeps working, until its settings are added in Vercel (Project → Settings → Environment Variables).
 
 ## 1. Database (automatic)
 
