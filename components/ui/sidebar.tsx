@@ -15,6 +15,7 @@ import {
   ChevronRight,
   Sparkles,
   LogOut,
+  Bell,
 } from "lucide-react";
 import { ProfileSwitcher } from "@/components/ui/profile-switcher";
 import type { OrgSummary } from "@/lib/user-orgs";
@@ -56,6 +57,11 @@ const navItems = [
     icon: FileText,
   },
   {
+    label: "Notifications",
+    href: "/notifications",
+    icon: Bell,
+  },
+  {
     label: "Settings",
     href: "/settings",
     icon: Settings,
@@ -67,9 +73,10 @@ interface SidebarProps {
   activeOrgId?: string | null;
   /** @deprecated use orgs + activeOrgId instead */
   orgName?: string;
+  unreadNotifications?: number;
 }
 
-export function Sidebar({ orgs, activeOrgId, orgName }: SidebarProps) {
+export function Sidebar({ orgs, activeOrgId, orgName, unreadNotifications = 0 }: SidebarProps) {
   const pathname = usePathname();
 
   const showSwitcher = orgs && orgs.length > 0;
@@ -135,6 +142,11 @@ export function Sidebar({ orgs, activeOrgId, orgName }: SidebarProps) {
                 size={18}
               />
               <span className="flex-1">{item.label}</span>
+              {item.href === "/notifications" && unreadNotifications > 0 && (
+                <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-amber-400 text-[11px] font-bold text-gray-900 flex items-center justify-center">
+                  {unreadNotifications > 99 ? "99+" : unreadNotifications}
+                </span>
+              )}
               {isActive && <ChevronRight className="w-3.5 h-3.5 text-white/60" />}
             </Link>
           );

@@ -4,13 +4,21 @@ import { Topbar } from "@/components/ui/topbar";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Info } from "lucide-react";
+import prisma from "@/lib/db/prisma";
+import { isEmailConfigured } from "@/lib/email/send";
+import { ReminderSettings } from "@/components/settings/reminder-settings";
 
 export const metadata = { title: "Settings" };
 
 export default async function SettingsPage() {
   const session = await auth();
-  if (!session?.user) redirect("/auth/login");
+  if (!session?.user?.id) redirect("/auth/login");
+
+  const dbUser = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { email: true, emailReminders: true },
+  });
+  if (!dbUser) redirect("/auth/login");
 
   return (
     <div>
@@ -48,22 +56,20 @@ export default async function SettingsPage() {
             />
             <SettingRow
               label="Email (Resend)"
-              value={process.env.RESEND_API_KEY ? "Configured" : "Not configured"}
-              status={!!process.env.RESEND_API_KEY}
+              value={isEmailConfigured() ? "Configured" : "Not configured"}
+              status={isEmailConfigured()}
             />
           </div>
         </Card>
 
         {/* Notifications */}
         <Card>
-          <CardTitle className="mb-2">Notifications</CardTitle>
-          <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-md p-3">
-            <Info size={14} className="text-blue-500 shrink-0 mt-0.5" />
-            <p className="text-xs text-blue-700">
-              Email notifications will be active once you configure a Resend API key and FROM
-              email address in your .env file. In-app notifications are always active.
-            </p>
-          </div>
+          <CardTitle className="mb-4">Reminders</CardTitle>
+          <ReminderSettings
+            initialEnabled={dbUser.emailReminders}
+            emailConfigured={isEmailConfigured()}
+            email={dbUser.email}
+          />
         </Card>
       </div>
     </div>
