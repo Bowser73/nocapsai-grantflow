@@ -129,29 +129,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             select: { organizationId: true, role: true },
           });
           if (dbUser) {
-            let orgId = dbUser.organizationId;
-
-            // Auto-link: if this user has no org, check whether exactly one org exists.
-            // If so, link them automatically so they immediately see real data.
-            // For 0 orgs: leave null (onboarding page handles creation).
-            // For 2+ orgs: leave null (onboarding page handles selection).
-            if (!orgId) {
-              const orgCount = await prisma.organization.count();
-              if (orgCount === 1) {
-                const singleOrg = await prisma.organization.findFirst({
-                  select: { id: true },
-                });
-                if (singleOrg) {
-                  await prisma.user.update({
-                    where: { id: token.sub as string },
-                    data: { organizationId: singleOrg.id },
-                  });
-                  orgId = singleOrg.id;
-                }
-              }
-            }
-
-            token.organizationId = orgId;
+            // A user with no organization stays unlinked until they create one or
+            // pick one they already have access to (onboarding page). Never link a
+            // user to an organization they did not create or were not added to.
+            token.organizationId = dbUser.organizationId;
             token.role = dbUser.role;
           }
         } catch (err) {

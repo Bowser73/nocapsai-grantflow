@@ -1,14 +1,13 @@
 /**
  * POST /api/onboarding/link-org
  *
- * Links a user with no active organization to an existing organization.
- * Unlike /api/profile/switch, this route does NOT require prior membership —
- * it is only callable when the user currently has organizationId = null.
+ * Sets the active organization for a user who currently has none.
  *
  * Security model:
  * - User must be authenticated
- * - User must currently have no organizationId (prevents hijacking)
- * - The target org must exist
+ * - User must currently have no organizationId
+ * - The target org must be one the user created (or already belongs to).
+ *   A user can never attach themselves to someone else's organization.
  */
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
@@ -53,8 +52,14 @@ export async function POST(request: Request) {
 
   const { organizationId } = parsed.data;
 
-  const org = await prisma.organization.findUnique({
-    where: { id: organizationId },
+  const org = await prisma.organization.findFirst({
+    where: {
+      id: organizationId,
+      OR: [
+        { createdByUserId: session.user.id },
+        { users: { some: { id: session.user.id } } },
+      ],
+    },
     select: { id: true, name: true },
   });
 

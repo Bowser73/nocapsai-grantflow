@@ -4,6 +4,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
+import prisma from "@/lib/db/prisma";
 import { runWriterAgentAllSections } from "@/lib/agents/writer-agent";
 
 // This route uses Prisma, the OpenAI client, and env-dependent logic at request
@@ -37,6 +38,14 @@ export async function POST(req: NextRequest) {
 
   if (!applicationId) {
     return NextResponse.json({ error: "Missing applicationId" }, { status: 400 });
+  }
+
+  const ownedApp = await prisma.grantApplication.findFirst({
+    where: { id: applicationId, organizationId: session.user.organizationId },
+    select: { id: true },
+  });
+  if (!ownedApp) {
+    return NextResponse.json({ error: "Application not found" }, { status: 404 });
   }
 
   // Run all writer agent sections
