@@ -10,10 +10,8 @@ import { contentDisposition, contentTypeFor } from "@/lib/storage/documents";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { docId: string } }
-) {
+export async function GET(req: NextRequest, props: { params: Promise<{ docId: string }> }) {
+  const params = await props.params;
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 

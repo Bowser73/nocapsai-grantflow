@@ -20,10 +20,8 @@ const BodySchema = z.object({
   notes:                 z.string().optional(),
 });
 
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: { appId: string } }
-) {
+export async function PATCH(req: NextRequest, props: { params: Promise<{ appId: string }> }) {
+  const params = await props.params;
   const session = await auth();
   if (!session?.user?.organizationId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

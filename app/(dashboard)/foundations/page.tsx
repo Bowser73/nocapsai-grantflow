@@ -29,7 +29,8 @@ const ASSET_OPTIONS = [
 
 interface SearchParams { q?: string; state?: string; kind?: string; min?: string; page?: string }
 
-export default async function FoundationsPage({ searchParams }: { searchParams?: SearchParams }) {
+export default async function FoundationsPage(props: { searchParams?: Promise<SearchParams> }) {
+  const searchParams = await props.searchParams;
   const session = await auth();
   if (!session?.user?.id) redirect("/auth/login");
   if (!session.user.organizationId) redirect("/profile");
