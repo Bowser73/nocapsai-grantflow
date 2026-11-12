@@ -1,17 +1,17 @@
 /**
  * Document Upload API
- * POST — Upload one or more documents for an organization
+ * POST — Upload one or more documents for the caller's active organization.
  *
- * In development: files are stored in /public/uploads/<orgId>/
- * In production: swap the writeFileToDisk function for S3 upload.
- * See lib/services/file-storage.ts for the production hook.
+ * File contents are stored in the database (DocumentBlob), so uploads persist
+ * on serverless hosts. See lib/storage/documents.ts for the size and type rules.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import prisma from "@/lib/db/prisma";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
-import type { DocumentType } from "@prisma/client";
+import { DocumentType } from "@prisma/client";
+import { contentTypeFor, documentFileUrl, validateUpload } from "@/lib/storage/documents";
+
+export const runtime = "nodejs";
 
 // Document type → human display name
 const DOC_TYPE_LABELS: Record<DocumentType, string> = {
@@ -41,10 +41,13 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData();
     const organizationId = formData.get("organizationId") as string;
     const docType = formData.get("docType") as DocumentType;
-    const files = formData.getAll("files") as File[];
+    const files = formData.getAll("files").filter((f): f is File => f instanceof File);
 
     if (!organizationId || !docType || !files.length) {
       return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
+    }
+    if (!(docType in DOC_TYPE_LABELS)) {
+      return NextResponse.json({ error: "Unknown document type." }, { status: 400 });
     }
 
     // Documents can only be added to the caller's active organization.
@@ -52,36 +55,35 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Dev: write to public/uploads — replace with S3 in prod
-    const uploadDir = path.join(process.cwd(), "public", "uploads", organizationId);
-    await mkdir(uploadDir, { recursive: true });
+    // Validate everything before storing anything.
+    for (const file of files) {
+      const problem = validateUpload(file.name, file.size);
+      if (problem) return NextResponse.json({ error: problem }, { status: 400 });
+    }
 
     const created = [];
     for (const file of files) {
-      const bytes = await file.arrayBuffer();
-      const buffer = Buffer.from(bytes);
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const mimeType = contentTypeFor(file.name)!;
 
-      // Sanitize filename
-      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const fileName = `${Date.now()}_${safeName}`;
-      const filePath = path.join(uploadDir, fileName);
-
-      // TODO [PRODUCTION]: Replace this with S3 upload:
-      // const fileUrl = await uploadToS3(buffer, fileName, file.type);
-      await writeFile(filePath, buffer);
-      const fileUrl = `/uploads/${organizationId}/${fileName}`;
-
-      const doc = await prisma.organizationDocument.create({
-        data: {
-          organizationId,
-          type: docType,
-          name: DOC_TYPE_LABELS[docType],
-          fileName: file.name,
-          fileUrl,
-          fileSize: file.size,
-          mimeType: file.type,
-          status: "ACTIVE",
-        },
+      const doc = await prisma.$transaction(async (tx) => {
+        const row = await tx.organizationDocument.create({
+          data: {
+            organizationId,
+            type: docType,
+            name: DOC_TYPE_LABELS[docType],
+            fileName: file.name,
+            fileUrl: "pending",
+            fileSize: buffer.length,
+            mimeType,
+            status: "ACTIVE",
+            blob: { create: { data: buffer } },
+          },
+        });
+        return tx.organizationDocument.update({
+          where: { id: row.id },
+          data: { fileUrl: documentFileUrl(row.id) },
+        });
       });
       created.push(doc);
     }
@@ -89,6 +91,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, data: created }, { status: 201 });
   } catch (error) {
     console.error("Document upload error:", error);
-    return NextResponse.json({ error: "Upload failed." }, { status: 500 });
+    return NextResponse.json({ error: "Upload failed. Please try again." }, { status: 500 });
   }
 }

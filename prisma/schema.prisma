@@ -163,6 +163,17 @@ model User {
 
   role          UserRole  @default(WRITER)
 
+  // Email reminders (deadlines, follow-ups). Users can turn these off in Settings.
+  emailReminders Boolean  @default(true)
+
+  // Billing. plan: "FREE" | "PRO" | "COMP" (complimentary full access).
+  // The Stripe fields are only set once a user starts a subscription.
+  plan                 String    @default("FREE")
+  stripeCustomerId     String?   @unique
+  stripeSubscriptionId String?   @unique
+  subscriptionStatus   String?   // Stripe status: "active", "trialing", "past_due", "canceled", ...
+  currentPeriodEnd     DateTime?
+
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id])
 
@@ -284,7 +295,7 @@ model OrganizationDocument {
   type           DocumentType
   name           String         // Display name
   fileName       String         // Original file name
-  fileUrl        String         // Storage URL (local path in dev, S3 in prod)
+  fileUrl        String         // Download URL: /api/organizations/documents/<id>/file
   fileSize       Int            // Bytes
   mimeType       String
 
@@ -292,11 +303,23 @@ model OrganizationDocument {
   expiresAt      DateTime?      // For time-sensitive docs (audit, financials)
   description    String?
 
+  // File contents (stored in the database so uploads survive serverless deploys)
+  blob           DocumentBlob?
+
   // Which grant applications reference this doc
   applications   GrantApplication[] @relation("ApplicationDocuments")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// File bytes live in their own table so listing documents never loads file contents.
+model DocumentBlob {
+  documentId String               @id
+  document   OrganizationDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  data       Bytes
+
+  createdAt DateTime @default(now())
 }
 
 // -----------------------------------------------------------------------------
@@ -719,6 +742,12 @@ model Notification {
   applicationId  String?
   opportunityId  String?
 
+  // Set for automatic reminders so the same reminder is never sent twice,
+  // e.g. "deadline:<applicationId>:<userId>:7d:2026-12-01"
+  dedupeKey      String?  @unique
+
   createdAt DateTime @default(now())
+
+  @@index([userId, isRead])
 }
 

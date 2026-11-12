@@ -9,8 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/input";
 import { cn, formatDate } from "@/lib/utils";
 import {
-  FileText, Upload, Trash2, AlertTriangle, CheckCircle, Clock
+  FileText, Upload, Trash2, AlertTriangle, CheckCircle, Clock, Download
 } from "lucide-react";
+import { MAX_UPLOAD_BYTES, MAX_UPLOAD_LABEL, isLegacyDiskFile, validateUpload } from "@/lib/storage/documents";
 import type { OrganizationDocument, DocumentType, DocumentStatus } from "@prisma/client";
 
 const DOC_TYPE_OPTIONS = [
@@ -51,9 +52,17 @@ export function OrgDocumentsPanel({ organizationId, documents }: Props) {
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [error, setError] = useState("");
 
-  const onDrop = useCallback((accepted: File[]) => {
+  const onDrop = useCallback((accepted: File[], rejected: { file: File }[]) => {
     setUploadedFiles(accepted);
-    setError("");
+    if (rejected.length) {
+      const first = rejected[0].file;
+      setError(
+        validateUpload(first.name, first.size) ??
+          `"${first.name}" could not be added. Up to 5 files at a time.`
+      );
+    } else {
+      setError("");
+    }
   }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -67,7 +76,7 @@ export function OrgDocumentsPanel({ organizationId, documents }: Props) {
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
     },
     maxFiles: 5,
-    maxSize: 10 * 1024 * 1024, // 10MB
+    maxSize: MAX_UPLOAD_BYTES,
   });
 
   async function handleUpload() {
@@ -75,25 +84,39 @@ export function OrgDocumentsPanel({ organizationId, documents }: Props) {
     setUploading(true);
     setError("");
 
+    // One file per request keeps each upload under the host's request size cap.
+    const remaining = [...uploadedFiles];
     try {
-      const formData = new FormData();
-      formData.append("organizationId", organizationId);
-      formData.append("docType", docType);
-      uploadedFiles.forEach((file) => formData.append("files", file));
+      while (remaining.length) {
+        const file = remaining[0];
+        const formData = new FormData();
+        formData.append("organizationId", organizationId);
+        formData.append("docType", docType);
+        formData.append("files", file);
 
-      const res = await fetch("/api/organizations/documents", {
-        method: "POST",
-        body: formData,
-      });
+        const res = await fetch("/api/organizations/documents", {
+          method: "POST",
+          body: formData,
+        });
 
-      if (!res.ok) throw new Error("Upload failed");
-
-      setUploadedFiles([]);
-      router.refresh();
-    } catch {
-      setError("Upload failed. Please try again.");
+        if (!res.ok) {
+          const body = await res.json().catch(() => null);
+          throw new Error(
+            body?.error ??
+              (res.status === 413
+                ? `"${file.name}" is too large to upload (limit ${MAX_UPLOAD_LABEL}).`
+                : `"${file.name}" failed to upload. Please try again.`)
+          );
+        }
+        remaining.shift();
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload failed. Please try again.");
     } finally {
+      // Keep only the files that did not make it, so a retry does not duplicate.
+      setUploadedFiles(remaining);
       setUploading(false);
+      router.refresh();
     }
   }
 
@@ -134,7 +157,7 @@ export function OrgDocumentsPanel({ organizationId, documents }: Props) {
               ) : (
                 <>
                   <p className="text-sm font-medium text-gray-700">Drop files here or click to browse</p>
-                  <p className="text-xs text-gray-400 mt-1">PDF, DOCX, XLS, PNG, JPG — max 10MB each</p>
+                  <p className="text-xs text-gray-400 mt-1">PDF, DOCX, XLS, PNG, JPG — max {MAX_UPLOAD_LABEL} each</p>
                 </>
               )}
             </div>
@@ -185,12 +208,28 @@ export function OrgDocumentsPanel({ organizationId, documents }: Props) {
                     {doc.fileName} · {(doc.fileSize / 1024).toFixed(0)} KB
                     {doc.expiresAt && ` · Expires ${formatDate(doc.expiresAt)}`}
                   </p>
+                  {isLegacyDiskFile(doc.fileUrl) && (
+                    <p className="text-xs text-amber-600 mt-0.5">
+                      File no longer available — remove this entry and upload it again.
+                    </p>
+                  )}
                 </div>
                 <span className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium", statusConfig.color)}>
                   <StatusIcon size={11} />
                   {statusConfig.label}
                 </span>
                 <span className="text-xs text-gray-400 shrink-0">{formatDate(doc.createdAt)}</span>
+                {!isLegacyDiskFile(doc.fileUrl) && (
+                  <a
+                    href={doc.fileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded transition-colors"
+                    title="Open or download"
+                  >
+                    <Download size={14} />
+                  </a>
+                )}
                 <button
                   onClick={() => handleDelete(doc.id)}
                   className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
