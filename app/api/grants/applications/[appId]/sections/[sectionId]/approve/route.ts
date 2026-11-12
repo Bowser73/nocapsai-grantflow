@@ -9,8 +9,9 @@ import prisma from "@/lib/db/prisma";
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { appId: string; sectionId: string } }
+  props: { params: Promise<{ appId: string; sectionId: string }> }
 ) {
+  const params = await props.params;
   const session = await auth();
   if (!session?.user?.organizationId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

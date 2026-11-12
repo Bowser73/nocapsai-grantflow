@@ -109,7 +109,7 @@ assert.notEqual(localLane?.sourceType, "Direct grant or award program");
 
 const contracting = business.sourceBuckets.find((bucket) => bucket.id === "government-contracting");
 assert.equal(contracting?.sourceType, "Procurement or contracting opportunity");
-assert.equal(contracting?.categoryLabel, "Government Procurement");
+assert.equal(contracting?.categoryLabel, "A5. Indiana / Federal Government Contracting");
 assert.notEqual(contracting?.categoryLabel, "Corporate / Private");
 
 const sba = business.sourceBuckets.find((bucket) => bucket.id === "sba-programs");

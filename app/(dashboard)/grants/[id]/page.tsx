@@ -81,11 +81,12 @@ function getGrantStage(input: unknown): GrantStageLabelKey | null {
   }
 }
 
-export default async function GrantDetailPage({
-  params,
-}: {
-  params: { id: string };
-}) {
+export default async function GrantDetailPage(
+  props: {
+    params: Promise<{ id: string }>;
+  }
+) {
+  const params = await props.params;
   const session = await auth();
   if (!session?.user) redirect("/auth/login");
 

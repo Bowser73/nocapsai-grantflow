@@ -10,10 +10,8 @@ const BodySchema = z.object({
   submittedAt: z.string().datetime(),
 });
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: { appId: string } }
-) {
+export async function POST(req: NextRequest, props: { params: Promise<{ appId: string }> }) {
+  const params = await props.params;
   const session = await auth();
   if (!session?.user?.organizationId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

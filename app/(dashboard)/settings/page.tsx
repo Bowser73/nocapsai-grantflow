@@ -24,11 +24,12 @@ const LIMIT_NOTICES: Record<string, string> = {
 
 export const metadata = { title: "Settings" };
 
-export default async function SettingsPage({
-  searchParams,
-}: {
-  searchParams?: { billing?: string; limit?: string };
-}) {
+export default async function SettingsPage(
+  props: {
+    searchParams?: Promise<{ billing?: string; limit?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const session = await auth();
   if (!session?.user?.id) redirect("/auth/login");
 

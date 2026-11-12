@@ -17,11 +17,12 @@ import {
 
 export const metadata = { title: "Application Workspace" };
 
-export default async function ApplicationWorkspacePage({
-  params,
-}: {
-  params: { id: string };
-}) {
+export default async function ApplicationWorkspacePage(
+  props: {
+    params: Promise<{ id: string }>;
+  }
+) {
+  const params = await props.params;
   const session = await auth();
   if (!session?.user) redirect("/auth/login");
 

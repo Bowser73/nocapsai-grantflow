@@ -83,29 +83,30 @@ function parseWritingStage(value?: string): GrantWritingStage | undefined {
  * All query params are used only for pre-filling — the user must
  * verify and complete all required fields before saving.
  */
-export default async function NewOpportunityPage({
-  searchParams,
-}: {
-  searchParams: {
-    sourceName?: string;
-    sourceUrl?: string;
-    categoryLabel?: string;
-    fitReason?: string;
-    searchTerm?: string;
-    eligibilityTag?: string;
-    applicationStatus?: string;
-    applicantOrganization?: string;
-    applicantTypeRequired?: string;
-    nocapsCanApplyDirectly?: string;
-    nocapsCanParticipateAsPartner?: string;
-    partnerClientName?: string;
-    nextAction?: string;
-    riskNotes?: string;
-    eligibilityNotes?: string;
-    sourceClassification?: string;
-    sourceIsVerifiedOpportunity?: string;
-  };
-}) {
+export default async function NewOpportunityPage(
+  props: {
+    searchParams: Promise<{
+      sourceName?: string;
+      sourceUrl?: string;
+      categoryLabel?: string;
+      fitReason?: string;
+      searchTerm?: string;
+      eligibilityTag?: string;
+      applicationStatus?: string;
+      applicantOrganization?: string;
+      applicantTypeRequired?: string;
+      nocapsCanApplyDirectly?: string;
+      nocapsCanParticipateAsPartner?: string;
+      partnerClientName?: string;
+      nextAction?: string;
+      riskNotes?: string;
+      eligibilityNotes?: string;
+      sourceClassification?: string;
+      sourceIsVerifiedOpportunity?: string;
+    }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const session = await auth();
   if (!session?.user) redirect("/auth/login");
 

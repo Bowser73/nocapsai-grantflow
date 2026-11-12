@@ -35,7 +35,7 @@ Without these, reminders still show up on the Notifications page; no email is se
 ## 4. Billing (Stripe)
 
 1. In Stripe, create a product with a recurring price of $29/month. Copy its price ID.
-2. Add a webhook endpoint at `https://<your-domain>/api/billing/webhook` for `checkout.session.completed`, `customer.subscription.updated` and `customer.subscription.deleted`. Copy its signing secret.
+2. Add a webhook endpoint at `https://<your-domain>/api/billing/webhook` for `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated` and `customer.subscription.deleted`. Copy its signing secret.
 
 | Setting | Value |
 |---|---|

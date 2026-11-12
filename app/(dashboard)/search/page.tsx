@@ -12,11 +12,12 @@ import { GrantSearchBox } from "@/components/search/grant-search-box";
 
 export const metadata = { title: "Grant Search" };
 
-export default async function SearchPage({
-  searchParams,
-}: {
-  searchParams: { q?: string; live?: string };
-}) {
+export default async function SearchPage(
+  props: {
+    searchParams: Promise<{ q?: string; live?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const session = await auth();
   if (!session?.user) redirect("/auth/login");
 

@@ -20,10 +20,8 @@ import {
 } from "docx";
 import { GRANT_SECTION_ORDER, GRANT_SECTION_LABELS } from "@/types";
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { appId: string } }
-) {
+export async function GET(req: NextRequest, props: { params: Promise<{ appId: string }> }) {
+  const params = await props.params;
   const session = await auth();
   if (!session?.user?.organizationId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

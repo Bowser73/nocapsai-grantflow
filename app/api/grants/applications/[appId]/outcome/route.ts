@@ -33,10 +33,8 @@ const DECISION_TO_APP_STATUS: Partial<Record<string, ApplicationStatus>> = {
   CLOSED:           "CLOSED",
 };
 
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: { appId: string } }
-) {
+export async function PATCH(req: NextRequest, props: { params: Promise<{ appId: string }> }) {
+  const params = await props.params;
   const session = await auth();
   if (!session?.user?.organizationId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
