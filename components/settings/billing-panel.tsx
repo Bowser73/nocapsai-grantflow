@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { PRO_PRICE_LABEL, type EffectivePlan, type PlanLimits } from "@/lib/billing/plans";
+import { PRO_PRICE_LABEL, needsPaymentFix, type EffectivePlan, type PlanLimits } from "@/lib/billing/plans";
 
 interface Props {
   enabled: boolean;              // billing switched on for this deployment
@@ -11,6 +11,7 @@ interface Props {
   subscriptionStatus: string | null;
   renewsOn: string | null;       // preformatted date
   hasBillingAccount: boolean;
+  hasSubscription: boolean;      // a Stripe subscription is on file (paid, unpaid or ended)
   limits: PlanLimits;
   usage: { organizations: number; applications: number; aiDraftsThisMonth: number };
   notice: { tone: "good" | "warn"; text: string } | null;
@@ -82,6 +83,8 @@ export function BillingPanel(props: Props) {
               ? "Paid plans are not switched on yet, so every feature is available to all accounts."
               : props.storedPlan === "COMP"
               ? "Full access at no charge."
+              : needsPaymentFix(props.subscriptionStatus)
+              ? "Your subscription is on hold because a payment did not go through. Update your card in Manage billing to restore Pro."
               : props.plan === "PRO"
               ? props.subscriptionStatus === "past_due"
                 ? "Your last payment did not go through. Update your card to keep Pro."
@@ -91,12 +94,12 @@ export function BillingPanel(props: Props) {
               : `Pro is ${PRO_PRICE_LABEL}: unlimited organization profiles and applications, and far more AI drafting.`}
           </p>
         </div>
-        {props.enabled && props.plan === "FREE" && (
+        {props.enabled && props.plan === "FREE" && !needsPaymentFix(props.subscriptionStatus) && (
           <Button onClick={() => go("checkout")} loading={busy === "checkout"} disabled={busy !== null}>
             Upgrade to Pro
           </Button>
         )}
-        {props.enabled && props.hasBillingAccount && props.storedPlan === "PRO" && (
+        {props.enabled && props.hasBillingAccount && props.hasSubscription && (
           <Button variant="secondary" onClick={() => go("portal")} loading={busy === "portal"} disabled={busy !== null}>
             Manage billing
           </Button>

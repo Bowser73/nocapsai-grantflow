@@ -34,6 +34,20 @@ export const PRO_PRICE_LABEL = "$29/month";
  *  unpaid/canceled if the retries fail. */
 const PAID_STATUSES = new Set(["active", "trialing", "past_due"]);
 
+/** A subscription that still exists in Stripe but is not giving paid access
+ *  until the customer fixes payment. Starting a second checkout here would
+ *  create a duplicate subscription; the fix is the billing portal. */
+const NEEDS_PAYMENT_STATUSES = new Set(["unpaid", "incomplete", "paused"]);
+
+export function needsPaymentFix(status: string | null | undefined): boolean {
+  return !!status && NEEDS_PAYMENT_STATUSES.has(status);
+}
+
+/** Stripe statuses that mean the subscription is over and a new one may be started. */
+export function subscriptionEnded(status: string): boolean {
+  return status === "canceled" || status === "incomplete_expired";
+}
+
 export interface PlanHolder {
   plan: string;
   subscriptionStatus: string | null;

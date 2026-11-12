@@ -3,10 +3,13 @@
  * One email per person per day, listing everything that is due for them.
  */
 import { appUrl, escapeHtml, type EmailMessage } from "@/lib/email/send";
-import type { DueReminder } from "@/lib/reminders/rules";
-
-export interface DigestItem extends DueReminder {
+export interface DigestItem {
+  title: string;
+  message: string;
+  href: string;
   orgName: string;
+  /** Days until the date the reminder is about; the soonest is listed first. */
+  daysLeft: number;
 }
 
 export function buildDigestEmail(to: string, name: string | null, items: DigestItem[]): EmailMessage {

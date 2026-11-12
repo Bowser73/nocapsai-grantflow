@@ -41,6 +41,7 @@ export default async function SettingsPage({
       subscriptionStatus: true,
       currentPeriodEnd: true,
       stripeCustomerId: true,
+      stripeSubscriptionId: true,
     },
   });
   if (!dbUser) redirect("/auth/login");
@@ -84,6 +85,7 @@ export default async function SettingsPage({
             subscriptionStatus={dbUser.subscriptionStatus}
             renewsOn={dbUser.currentPeriodEnd ? formatDate(dbUser.currentPeriodEnd) : null}
             hasBillingAccount={!!dbUser.stripeCustomerId}
+            hasSubscription={!!dbUser.stripeSubscriptionId}
             limits={entitlements.limits}
             usage={entitlements.usage}
             notice={notice}

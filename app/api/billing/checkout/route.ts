@@ -5,10 +5,9 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import prisma from "@/lib/db/prisma";
-import { appUrl } from "@/lib/email/send";
 import { billingEnabled } from "@/lib/billing/entitlements";
 import { effectivePlan } from "@/lib/billing/plans";
-import { ensureCustomer, getStripe } from "@/lib/billing/stripe";
+import { startProCheckout } from "@/lib/billing/checkout";
 
 export const runtime = "nodejs";
 
@@ -28,19 +27,11 @@ export async function POST() {
   }
 
   try {
-    const customer = await ensureCustomer(session.user.id);
-    const checkout = await getStripe().checkout.sessions.create({
-      mode: "subscription",
-      customer,
-      client_reference_id: session.user.id,
-      line_items: [{ price: process.env.STRIPE_PRICE_ID!, quantity: 1 }],
-      allow_promotion_codes: true,
-      success_url: appUrl("/settings?billing=success"),
-      cancel_url: appUrl("/settings?billing=cancelled"),
-      subscription_data: { metadata: { userId: session.user.id } },
-    });
-    if (!checkout.url) throw new Error("Stripe did not return a checkout URL");
-    return NextResponse.json({ url: checkout.url });
+    const result = await startProCheckout(session.user.id);
+    if (result.kind === "conflict") {
+      return NextResponse.json({ error: result.message }, { status: 409 });
+    }
+    return NextResponse.json({ url: result.url });
   } catch (err) {
     console.error("[billing] checkout failed:", err instanceof Error ? err.message : String(err));
     return NextResponse.json({ error: "Could not start checkout. Please try again." }, { status: 502 });

@@ -5,6 +5,7 @@
 
 -- Notification: reminder de-duplication key
 ALTER TABLE "Notification" ADD COLUMN IF NOT EXISTS "dedupeKey" TEXT;
+ALTER TABLE "Notification" ADD COLUMN IF NOT EXISTS "emailPending" BOOLEAN NOT NULL DEFAULT false;
 
 -- User: reminder preference + billing
 ALTER TABLE "User"
@@ -26,6 +27,7 @@ CREATE TABLE IF NOT EXISTS "DocumentBlob" (
 
 CREATE UNIQUE INDEX IF NOT EXISTS "Notification_dedupeKey_key" ON "Notification"("dedupeKey");
 CREATE INDEX IF NOT EXISTS "Notification_userId_isRead_idx" ON "Notification"("userId", "isRead");
+CREATE INDEX IF NOT EXISTS "Notification_emailPending_idx" ON "Notification"("emailPending");
 CREATE UNIQUE INDEX IF NOT EXISTS "User_stripeCustomerId_key" ON "User"("stripeCustomerId");
 CREATE UNIQUE INDEX IF NOT EXISTS "User_stripeSubscriptionId_key" ON "User"("stripeSubscriptionId");
 

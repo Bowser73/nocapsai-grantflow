@@ -141,3 +141,11 @@ export function remindersFor(app: ReminderApplication, now: Date): DueReminder[]
 
   return out;
 }
+
+/** The date a stored reminder key is about (every key carries one), or null. */
+export function dateFromReminderKey(key: string): Date | null {
+  const m = key.match(/(\d{4}-\d{2}-\d{2})/);
+  if (!m) return null;
+  const d = new Date(`${m[1]}T00:00:00Z`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}

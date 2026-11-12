@@ -778,8 +778,13 @@ model Notification {
   // e.g. "deadline:<applicationId>:<userId>:7d:2026-12-01"
   dedupeKey      String?  @unique
 
+  // True while a reminder email for this notification is still owed. Kept in the
+  // database so an interrupted run is picked up by the next one.
+  emailPending   Boolean  @default(false)
+
   createdAt DateTime @default(now())
 
   @@index([userId, isRead])
+  @@index([emailPending])
 }
 
