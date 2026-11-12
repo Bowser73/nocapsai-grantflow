@@ -5,7 +5,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import prisma from "@/lib/db/prisma";
-import { redirect } from "next/navigation";
+import { canStartApplication } from "@/lib/billing/entitlements";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -27,6 +27,11 @@ export async function POST(req: NextRequest) {
 
   if (existing) {
     return NextResponse.redirect(new URL(`/grants/${existing.id}/apply`, req.url));
+  }
+
+  const limit = await canStartApplication(session.user.id, session.user.organizationId);
+  if (!limit.allowed) {
+    return NextResponse.redirect(new URL("/settings?limit=applications", req.url), 303);
   }
 
   const opportunity = await prisma.grantOpportunity.findUnique({

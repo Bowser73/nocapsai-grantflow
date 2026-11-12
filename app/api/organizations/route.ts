@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import prisma from "@/lib/db/prisma";
 import { z } from "zod";
+import { canCreateOrganization } from "@/lib/billing/entitlements";
 
 const CreateOrgSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -30,6 +31,11 @@ export async function POST(request: Request) {
 
   const { name, orgType, missionStatement, website, city, state, switchToNew } =
     parsed.data;
+
+  const limit = await canCreateOrganization(session.user.id);
+  if (!limit.allowed) {
+    return NextResponse.json({ error: limit.message, limit: limit.kind }, { status: 402 });
+  }
 
   // Create the new org, linking it to this user as creator
   const org = await prisma.organization.create({

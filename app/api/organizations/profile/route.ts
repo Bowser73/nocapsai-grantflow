@@ -8,6 +8,7 @@ import { auth } from "@/auth";
 import prisma from "@/lib/db/prisma";
 import { computeProfileCompleteness } from "@/lib/utils";
 import { z } from "zod";
+import { canCreateOrganization } from "@/lib/billing/entitlements";
 
 const schema = z.object({
   userId: z.string(),
@@ -40,6 +41,11 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const data = schema.parse(body);
+
+    const limit = await canCreateOrganization(session.user.id);
+    if (!limit.allowed) {
+      return NextResponse.json({ error: limit.message, limit: limit.kind }, { status: 402 });
+    }
 
     const profileCompleteness = computeProfileCompleteness(data as Record<string, unknown>);
 

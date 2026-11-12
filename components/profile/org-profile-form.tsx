@@ -96,11 +96,15 @@ export function OrgProfileForm({ org, userId }: Props) {
         }),
       });
 
-      if (!res.ok) throw new Error("Save failed");
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        // 402 = plan limit reached; show the server's explanation.
+        throw new Error(res.status === 402 && body?.error ? body.error : "Failed to save. Please try again.");
+      }
       setSaved(true);
       router.refresh();
-    } catch {
-      alert("Failed to save. Please try again.");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to save. Please try again.");
     } finally {
       setSaving(false);
     }

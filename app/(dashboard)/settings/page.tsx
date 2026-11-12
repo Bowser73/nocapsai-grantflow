@@ -7,18 +7,49 @@ import { Badge } from "@/components/ui/badge";
 import prisma from "@/lib/db/prisma";
 import { isEmailConfigured } from "@/lib/email/send";
 import { ReminderSettings } from "@/components/settings/reminder-settings";
+import { BillingPanel } from "@/components/settings/billing-panel";
+import { entitlementsFor } from "@/lib/billing/entitlements";
+import { PLAN_LIMITS, PRO_PRICE_LABEL } from "@/lib/billing/plans";
+import { formatDate } from "@/lib/utils";
+
+const LIMIT_NOTICES: Record<string, string> = {
+  applications: `The Free plan includes ${PLAN_LIMITS.FREE.applications} applications per organization. Upgrade to Pro (${PRO_PRICE_LABEL}) to start another.`,
+  aiDrafts: `That would go past this month's AI drafting allowance on your plan. Upgrade to Pro (${PRO_PRICE_LABEL}) for more, or wait until the 1st.`,
+  organizations: `The Free plan includes ${PLAN_LIMITS.FREE.organizations} organization profile. Upgrade to Pro (${PRO_PRICE_LABEL}) to add another.`,
+};
 
 export const metadata = { title: "Settings" };
 
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams?: { billing?: string; limit?: string };
+}) {
   const session = await auth();
   if (!session?.user?.id) redirect("/auth/login");
 
   const dbUser = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { email: true, emailReminders: true },
+    select: {
+      email: true,
+      emailReminders: true,
+      plan: true,
+      subscriptionStatus: true,
+      currentPeriodEnd: true,
+      stripeCustomerId: true,
+    },
   });
   if (!dbUser) redirect("/auth/login");
+
+  const entitlements = await entitlementsFor(session.user.id, session.user.organizationId);
+  const notice =
+    searchParams?.billing === "success"
+      ? { tone: "good" as const, text: "Thanks — your payment went through. Pro switches on within a minute; refresh this page if it still shows Free." }
+      : searchParams?.billing === "cancelled"
+      ? { tone: "warn" as const, text: "Checkout was cancelled. You have not been charged." }
+      : searchParams?.limit && LIMIT_NOTICES[searchParams.limit]
+      ? { tone: "warn" as const, text: LIMIT_NOTICES[searchParams.limit] }
+      : null;
 
   return (
     <div>
@@ -37,6 +68,22 @@ export default async function SettingsPage() {
           </div>
         </Card>
 
+        {/* Plan & billing */}
+        <Card>
+          <CardTitle className="mb-4">Plan &amp; billing</CardTitle>
+          <BillingPanel
+            enabled={entitlements.enforced}
+            plan={entitlements.plan}
+            storedPlan={dbUser.plan}
+            subscriptionStatus={dbUser.subscriptionStatus}
+            renewsOn={dbUser.currentPeriodEnd ? formatDate(dbUser.currentPeriodEnd) : null}
+            hasBillingAccount={!!dbUser.stripeCustomerId}
+            limits={entitlements.limits}
+            usage={entitlements.usage}
+            notice={notice}
+          />
+        </Card>
+
         {/* API Keys */}
         <Card>
           <CardTitle className="mb-2">API Configuration</CardTitle>
@@ -53,6 +100,11 @@ export default async function SettingsPage() {
               label="Grants.gov API"
               value="Free — no key required"
               status={true}
+            />
+            <SettingRow
+              label="Billing (Stripe)"
+              value={entitlements.enforced ? "Configured" : "Not configured"}
+              status={entitlements.enforced}
             />
             <SettingRow
               label="Email (Resend)"
