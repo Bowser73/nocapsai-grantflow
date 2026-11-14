@@ -42,9 +42,9 @@
    typed-in fields, a rubber stamp, and a highlighter for anything
    that still needs checking. */
 @layer base {
-  body { background-color: #FAFBF7; }
+  body { background-color: #F4F8F6; }
   h1, h2 { font-family: var(--font-display), var(--font-sans), system-ui, sans-serif; }
-  ::selection { background: #FFE04A; color: #14213D; }
+  ::selection { background: #00EC95; color: #002319; }
 }
 
 @layer components {
@@ -88,13 +88,13 @@
     justify-content: center;
     min-width: 2.25rem;
     height: 2.25rem;
-    border: 1.5px solid #14213D;
-    color: #14213D;
+    border: 1.5px solid #0C2A2E;
+    color: #0C2A2E;
     background: #ffffff;
   }
 
   .focus-ring:focus-visible {
-    outline: 3px solid #FFE04A;
+    outline: 3px solid #00EC95;
     outline-offset: 2px;
   }
 }

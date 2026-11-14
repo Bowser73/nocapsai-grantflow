@@ -64,7 +64,9 @@ export default async function Home() {
       {/* ── Header ───────────────────────────────────────────── */}
       <header className="border-b border-rule bg-paper/95 backdrop-blur sticky top-0 z-20">
         <div className="mx-auto max-w-6xl px-5 h-16 flex items-center justify-between gap-4">
-          <Link href="/" className="focus-ring rounded" aria-label="GrantFlow home"><Logo /></Link>
+          <div className="flex items-center gap-4"><Link href="/" className="focus-ring rounded" aria-label="GrantFlow home"><Logo /></Link><a href="https://nocapsai.com" target="_blank" rel="noopener noreferrer" className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-brand-200 bg-white py-0.5 pl-0.5 pr-2.5 text-xs font-semibold text-brand-700 hover:border-brand-500"><span className="flex">{[3, 1, 2].map((n) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img key={n} src={`/brand/nocapsai-logo-${n}.webp`} alt="" width={22} height={22} className="-mr-1.5 h-[22px] w-[22px] rounded-full border-2 border-white object-cover" />))}</span><span className="ml-1.5">by NoCapsAI</span></a></div>
           <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-brand-700" aria-label="Page sections">
             <a href="#how" className="hover:text-brand-900 focus-ring rounded">How it works</a>
             <a href="#honest" className="hover:text-brand-900 focus-ring rounded">What it will not do</a>
@@ -90,9 +92,9 @@ export default async function Home() {
               {["Find the grant.", "Write it honestly.", "Make the deadline."].map((line) => (
                 <span key={line} className="flex items-start gap-3 sm:gap-4 lg:whitespace-nowrap">
                   <svg viewBox="0 0 32 32" className="w-[0.82em] h-[0.82em] mt-[0.13em] shrink-0" fill="none" aria-hidden="true">
-                    <rect x="3" y="3" width="26" height="26" rx="2" stroke="#14213D" strokeWidth="2.5" />
-                    <path d="M9 16.5l5 5L24 10" stroke="#FFE04A" strokeWidth="6.5" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M9 16.5l5 5L24 10" stroke="#14213D" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                    <rect x="3" y="3" width="26" height="26" rx="2" stroke="#0C2A2E" strokeWidth="2.5" />
+                    <path d="M9 16.5l5 5L24 10" stroke="#00EC95" strokeWidth="6.5" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M9 16.5l5 5L24 10" stroke="#0C2A2E" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                   <span>{line}</span>
                 </span>
@@ -231,7 +233,7 @@ export default async function Home() {
                     Create a free account
                   </Link>
                 </div>
-                <div className="border-2 border-brand-800 bg-white p-7 shadow-[8px_8px_0_0_#FFE04A]">
+                <div className="border-2 border-brand-800 bg-white p-7 shadow-[8px_8px_0_0_#00EC95]">
                   <h3 className="font-display font-bold text-xl">Pro</h3>
                   <p className="mt-1 font-display font-extrabold text-4xl">
                     {PRO_PRICE_LABEL.split("/")[0]}
@@ -251,7 +253,7 @@ export default async function Home() {
               </div>
             </>
           ) : (
-            <div className="mt-8 border-2 border-brand-800 bg-white p-7 max-w-2xl shadow-[8px_8px_0_0_#FFE04A]">
+            <div className="mt-8 border-2 border-brand-800 bg-white p-7 max-w-2xl shadow-[8px_8px_0_0_#00EC95]">
               <h3 className="font-display font-bold text-xl">Free during early access</h3>
               <p className="mt-3 text-brand-700 leading-relaxed">
                 Every feature is open while GrantFlow is in early access. Paid plans will be announced

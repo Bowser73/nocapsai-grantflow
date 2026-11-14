@@ -88,10 +88,32 @@ export function Sidebar({ orgs, activeOrgId, orgName, unreadNotifications = 0 }:
   const showSwitcher = orgs && orgs.length > 0;
 
   return (
-    <aside className="w-60 shrink-0 flex flex-col bg-brand-800 h-screen sticky top-0">
+    <aside className="w-60 shrink-0 flex flex-col h-screen sticky top-0 bg-[#06151c] bg-[radial-gradient(120%_60%_at_0%_0%,rgba(0,236,149,.14),transparent_60%),linear-gradient(180deg,#0c2a2e,#06151c)]">
       {/* Logo */}
-      <div className="h-14 flex items-center px-5 border-b border-white/10">
-        <Link href="/dashboard" aria-label="GrantFlow dashboard">
+      <div className="flex flex-col gap-3 px-5 pt-4 pb-3 border-b border-white/10">
+        <a
+          href="https://nocapsai.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="NoCapsAI website"
+          className="group inline-flex w-fit items-center gap-2.5 rounded-md"
+        >
+          <span className="flex">
+            {[3, 1, 2].map((n) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={n}
+                src={`/brand/nocapsai-logo-${n}.webp`}
+                alt=""
+                width={34}
+                height={34}
+                className="-mr-2 h-[34px] w-[34px] rounded-full border-2 border-[#0c2a2e] object-cover shadow-[0_0_12px_rgba(0,236,149,.35)] transition-transform group-hover:-translate-y-0.5"
+              />
+            ))}
+          </span>
+          <span className="ml-2.5 font-bold text-[17px] tracking-tight text-white group-hover:text-mint">NoCapsAI</span>
+        </a>
+        <Link href="/dashboard" aria-label="GrantFlow dashboard" className="w-fit">
           <Logo tone="light" />
         </Link>
       </div>
@@ -133,7 +155,7 @@ export function Sidebar({ orgs, activeOrgId, orgName, unreadNotifications = 0 }:
               className={cn(
                 "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium mb-0.5 group transition-colors",
                 isActive
-                  ? "bg-white/10 text-white shadow-[inset_3px_0_0_0_#FFE04A]"
+                  ? "bg-white/10 text-white shadow-[inset_3px_0_0_0_#00EC95]"
                   : "text-brand-200 hover:bg-white/10 hover:text-white"
               )}
             >

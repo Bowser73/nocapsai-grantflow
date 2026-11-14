@@ -15,18 +15,20 @@ const config: Config = {
         // GrantFlow palette — the paperwork itself.
         // brand = ledger ink (the blue-black of a filled-in form).
         brand: {
-          50:  "#F2F5FA",
-          100: "#E3EAF4",
-          200: "#C9D6EA",
-          300: "#9DB2D3",
-          400: "#6A85B4",
-          500: "#3F5E96",
-          600: "#233F74",
-          700: "#182E58",
-          800: "#14213D",
-          900: "#0C1630",
+          // NoCapsAI palette: mint accent fading into deep teal (matches nocapsai.com)
+          50:  "#EEFAF4",
+          100: "#D3F3E4",
+          200: "#A6E6CB",
+          300: "#6CD3AC",
+          400: "#2FBF8A",
+          500: "#00A36C",
+          600: "#00845A",
+          700: "#0A6B4C",
+          800: "#0C2A2E",
+          900: "#06151C",
         },
-        paper: "#FAFBF7",        // form stock (a cool white, not cream)
+        mint: "#00EC95",         // NoCapsAI signature accent
+        paper: "#F4F8F6",        // light, slightly minty page background
         rule: "#C9D6EA",         // ruled lines on a form
         highlight: "#FFE04A",    // highlighter: marks anything not yet verified
         stamp: {
