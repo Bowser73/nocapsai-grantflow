@@ -15,6 +15,7 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard";
   const justRegistered = searchParams.get("registered") === "1";
+  const justReset = searchParams.get("reset") === "1";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -59,6 +60,13 @@ function LoginForm() {
         </div>
       )}
 
+      {justReset && !error && (
+        <div className="flex items-center gap-2 bg-green-50 text-stamp-green border border-green-200 rounded-md px-3 py-2.5 text-sm mb-4">
+          <CheckCircle size={16} className="shrink-0" />
+          Your password was changed. Log in with your new password.
+        </div>
+      )}
+
       {/* Error */}
       {error && (
         <div className="flex items-center gap-2 bg-red-50 text-red-700 border border-red-200 rounded-md px-3 py-2.5 text-sm mb-4">
@@ -87,6 +95,11 @@ function LoginForm() {
           autoComplete="current-password"
           placeholder="••••••••"
         />
+        <div className="-mt-2 text-right">
+          <Link href="/auth/forgot-password" className="text-sm font-semibold text-[#00a96b] hover:underline">
+            Forgot password?
+          </Link>
+        </div>
         <Button type="submit" loading={loading} className="w-full mt-1 h-11 bg-[#00ec95] font-bold text-[#002319] hover:bg-[#65ffbe] focus-visible:ring-[#00ec95]">
           Log in
         </Button>
