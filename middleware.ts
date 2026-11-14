@@ -9,5 +9,6 @@ import { authConfig } from "./auth.config";
 export const { auth: middleware } = NextAuth(authConfig);
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|public/).*)" ],
+  // brand/ holds public NoCapsAI logo and artwork used on the log-in and sign-up pages
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|brand/|public/).*)" ],
 };

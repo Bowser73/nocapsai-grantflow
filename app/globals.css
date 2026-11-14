@@ -109,3 +109,12 @@
 @media (prefers-reduced-motion: no-preference) {
   .stamp-in { animation: stamp-down 0.5s cubic-bezier(0.2, 0.9, 0.3, 1) 0.9s both; }
 }
+
+/* ───────────────────── NoCapsAI brand: log-in / sign-up ───────────────────── */
+.nc-auth .nc-orbits i{position:absolute;left:50%;top:50%;width:min(110vw,1200px);aspect-ratio:1;border:1px solid rgba(0,236,149,.18);border-radius:50%;
+  transform:translate(-50%,-50%) rotateX(60deg) rotate(-25deg);animation:nc-orbit 28s linear infinite}
+.nc-auth .nc-orbits i::after{content:"";position:absolute;top:14%;left:14%;width:8px;height:8px;border-radius:50%;background:#7affca;box-shadow:0 0 22px 6px rgba(0,236,149,.45)}
+.nc-auth .nc-orbits i:nth-child(2){width:min(150vw,1600px);animation-direction:reverse;animation-duration:38s;border-color:rgba(167,186,255,.14)}
+@keyframes nc-orbit{to{transform:translate(-50%,-50%) rotateX(60deg) rotate(335deg)}}
+@media (prefers-reduced-motion:reduce){.nc-auth .nc-orbits i{animation:none}}
+.nc-auth-footer a{color:#00ec95 !important}

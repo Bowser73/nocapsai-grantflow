@@ -87,7 +87,7 @@ function LoginForm() {
           autoComplete="current-password"
           placeholder="••••••••"
         />
-        <Button type="submit" loading={loading} className="w-full mt-1">
+        <Button type="submit" loading={loading} className="w-full mt-1 h-11 bg-[#00ec95] font-bold text-[#002319] hover:bg-[#65ffbe] focus-visible:ring-[#00ec95]">
           Log in
         </Button>
       </form>
@@ -103,7 +103,7 @@ export default function LoginPage() {
       footer={
         <>
           New to GrantFlow?{" "}
-          <Link href="/auth/register" className="font-semibold text-brand-800 underline">
+          <Link href="/auth/register" className="font-semibold text-[#00ec95] underline">
             Create a free account
           </Link>
         </>

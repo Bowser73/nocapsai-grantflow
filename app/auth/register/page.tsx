@@ -50,7 +50,7 @@ export default function RegisterPage() {
       footer={
         <>
           Already have an account?{" "}
-          <Link href="/auth/login" className="font-semibold text-brand-800 underline">
+          <Link href="/auth/login" className="font-semibold text-[#00ec95] underline">
             Log in
           </Link>
         </>
@@ -68,7 +68,7 @@ export default function RegisterPage() {
         <Input label="Email" type="email" required autoComplete="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="you@example.org" />
         <Input label="Password" type="password" required minLength={8} autoComplete="new-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="At least 8 characters" />
         <Input label="Confirm password" type="password" required autoComplete="new-password" value={form.confirm} onChange={(e) => setForm({ ...form, confirm: e.target.value })} placeholder="Type it again" />
-        <Button type="submit" loading={loading} className="w-full mt-1">
+        <Button type="submit" loading={loading} className="w-full mt-1 h-11 bg-[#00ec95] font-bold text-[#002319] hover:bg-[#65ffbe] focus-visible:ring-[#00ec95]">
           Create account
         </Button>
       </form>
