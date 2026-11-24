@@ -1,0 +1,16 @@
+Prepared, not submitted or certified.
+
+App name: NoCapsAI GrantFlow
+Package: com.nocapsai.grantflow
+Category: Business
+Audience candidate: adults 18+ managing grant work. Owner must confirm.
+Ads: No advertising SDK or advertising ID permission found.
+App access: sign-in required. A dedicated non-admin reviewer account with fictional data and durable access is still needed; do not share the owner's account.
+AI-generated content: Yes, AI-assisted grant drafts. In-app report submission and restricted /content-reports review are prepared in this branch. Review generated-content labeling and prevention behavior before certification.
+Content rating: complete the actual IARC questionnaire truthfully; no rating has been assigned.
+Financial features: grant research and application preparation, no lending or disbursement. Review the exact Console categories before answering; no form has been submitted.
+Privacy URL: https://nocapsai-grantflow.vercel.app/privacy (prepared locally; not live yet)
+Deletion URL: https://nocapsai-grantflow.vercel.app/delete-account (prepared locally; operator-assisted email request; not live yet)
+Data safety: see data-safety-draft.json. Do not claim no collection.
+
+Phone screenshots: genuine live web login and registration at 432x864. They are not verified Android-runtime captures and do not show authenticated features. Replace/supplement with actual installed-app screenshots before final publication.

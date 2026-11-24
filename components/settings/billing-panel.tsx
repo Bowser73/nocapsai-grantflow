@@ -1,30 +1,54 @@
 "use client";
 
+import { usePlayContext } from "@/components/play-context";
+import { PlayBillingPanel } from "./play-billing-panel";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { PRO_PRICE_LABEL, needsPaymentFix, type EffectivePlan, type PlanLimits } from "@/lib/billing/plans";
+import {
+  PRO_PRICE_LABEL,
+  needsPaymentFix,
+  type EffectivePlan,
+  type PlanLimits,
+} from "@/lib/billing/plans";
 
 interface Props {
-  enabled: boolean;              // billing switched on for this deployment
+  enabled: boolean; // billing switched on for this deployment
   plan: EffectivePlan;
-  storedPlan: string;            // FREE | PRO | COMP
+  storedPlan: string; // FREE | PRO | COMP
   subscriptionStatus: string | null;
-  renewsOn: string | null;       // preformatted date
+  renewsOn: string | null; // preformatted date
   hasBillingAccount: boolean;
-  hasSubscription: boolean;      // a Stripe subscription is on file (paid, unpaid or ended)
+  hasSubscription: boolean; // a Stripe subscription is on file (paid, unpaid or ended)
   limits: PlanLimits;
-  usage: { organizations: number; applications: number; aiDraftsThisMonth: number };
+  usage: {
+    organizations: number;
+    applications: number;
+    aiDraftsThisMonth: number;
+  };
   notice: { tone: "good" | "warn"; text: string } | null;
 }
 
-function Meter({ label, used, limit }: { label: string; used: number; limit: number | null }) {
-  const pct = limit === null ? 0 : Math.min(100, Math.round((used / Math.max(limit, 1)) * 100));
+function Meter({
+  label,
+  used,
+  limit,
+}: {
+  label: string;
+  used: number;
+  limit: number | null;
+}) {
+  const pct =
+    limit === null
+      ? 0
+      : Math.min(100, Math.round((used / Math.max(limit, 1)) * 100));
   const full = limit !== null && used >= limit;
   return (
     <div>
       <div className="flex items-baseline justify-between text-xs mb-1">
         <span className="text-gray-600">{label}</span>
-        <span className={full ? "font-semibold text-amber-700" : "text-gray-500"}>
+        <span
+          className={full ? "font-semibold text-amber-700" : "text-gray-500"}
+        >
           {used} {limit === null ? "· no limit" : `of ${limit}`}
         </span>
       </div>
@@ -41,6 +65,7 @@ function Meter({ label, used, limit }: { label: string; used: number; limit: num
 }
 
 export function BillingPanel(props: Props) {
+  const play = usePlayContext();
   const [busy, setBusy] = useState<"checkout" | "portal" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,16 +75,30 @@ export function BillingPanel(props: Props) {
     try {
       const res = await fetch(`/api/billing/${kind}`, { method: "POST" });
       const body = await res.json().catch(() => ({}));
-      if (!res.ok || !body.url) throw new Error(body.error ?? "Something went wrong. Please try again.");
+      if (!res.ok || !body.url)
+        throw new Error(
+          body.error ?? "Something went wrong. Please try again.",
+        );
       window.location.assign(body.url);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Something went wrong. Please try again.",
+      );
       setBusy(null);
     }
   }
 
+  if (play === null) return <p className="text-sm">Loading billing options…</p>;
+  if (play) return <PlayBillingPanel />;
+
   const planName =
-    props.storedPlan === "COMP" ? "Pro (complimentary)" : props.plan === "PRO" ? "Pro" : "Free";
+    props.storedPlan === "COMP"
+      ? "Pro (complimentary)"
+      : props.plan === "PRO"
+        ? "Pro"
+        : "Free";
 
   return (
     <div className="space-y-4">
@@ -82,25 +121,36 @@ export function BillingPanel(props: Props) {
             {!props.enabled
               ? "Paid plans are not switched on yet, so every feature is available to all accounts."
               : props.storedPlan === "COMP"
-              ? "Full access at no charge."
-              : needsPaymentFix(props.subscriptionStatus)
-              ? "Your subscription is on hold because a payment did not go through. Update your card in Manage billing to restore Pro."
-              : props.plan === "PRO"
-              ? props.subscriptionStatus === "past_due"
-                ? "Your last payment did not go through. Update your card to keep Pro."
-                : props.renewsOn
-                ? `${PRO_PRICE_LABEL} · next billing date ${props.renewsOn}`
-                : PRO_PRICE_LABEL
-              : `Pro is ${PRO_PRICE_LABEL}: unlimited organization profiles and applications, and far more AI drafting.`}
+                ? "Full access at no charge."
+                : needsPaymentFix(props.subscriptionStatus)
+                  ? "Your subscription is on hold because a payment did not go through. Update your card in Manage billing to restore Pro."
+                  : props.plan === "PRO"
+                    ? props.subscriptionStatus === "past_due"
+                      ? "Your last payment did not go through. Update your card to keep Pro."
+                      : props.renewsOn
+                        ? `${PRO_PRICE_LABEL} · next billing date ${props.renewsOn}`
+                        : PRO_PRICE_LABEL
+                    : `Pro is ${PRO_PRICE_LABEL}: unlimited organization profiles and applications, and far more AI drafting.`}
           </p>
         </div>
-        {props.enabled && props.plan === "FREE" && !needsPaymentFix(props.subscriptionStatus) && (
-          <Button onClick={() => go("checkout")} loading={busy === "checkout"} disabled={busy !== null}>
-            Upgrade to Pro
-          </Button>
-        )}
+        {props.enabled &&
+          props.plan === "FREE" &&
+          !needsPaymentFix(props.subscriptionStatus) && (
+            <Button
+              onClick={() => go("checkout")}
+              loading={busy === "checkout"}
+              disabled={busy !== null}
+            >
+              Upgrade to Pro
+            </Button>
+          )}
         {props.enabled && props.hasBillingAccount && props.hasSubscription && (
-          <Button variant="secondary" onClick={() => go("portal")} loading={busy === "portal"} disabled={busy !== null}>
+          <Button
+            variant="secondary"
+            onClick={() => go("portal")}
+            loading={busy === "portal"}
+            disabled={busy !== null}
+          >
             Manage billing
           </Button>
         )}
@@ -108,9 +158,21 @@ export function BillingPanel(props: Props) {
 
       {props.enabled && (
         <div className="space-y-3 pt-1">
-          <Meter label="Organization profiles" used={props.usage.organizations} limit={props.limits.organizations} />
-          <Meter label="Applications in this organization" used={props.usage.applications} limit={props.limits.applications} />
-          <Meter label="AI-written sections this month" used={props.usage.aiDraftsThisMonth} limit={props.limits.aiDraftsPerMonth} />
+          <Meter
+            label="Organization profiles"
+            used={props.usage.organizations}
+            limit={props.limits.organizations}
+          />
+          <Meter
+            label="Applications in this organization"
+            used={props.usage.applications}
+            limit={props.limits.applications}
+          />
+          <Meter
+            label="AI-written sections this month"
+            used={props.usage.aiDraftsThisMonth}
+            limit={props.limits.aiDraftsPerMonth}
+          />
         </div>
       )}
 

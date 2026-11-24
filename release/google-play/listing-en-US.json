@@ -1,0 +1,15 @@
+{
+  "status": "Prepared draft; not submitted",
+  "language": "en-US",
+  "title": "NoCapsAI GrantFlow",
+  "shortDescription": "Find funders, draft grant applications, and keep deadlines in view.",
+  "fullDescription": "Find the grant. Write it honestly. Make the deadline.\n\nGrantFlow by NoCapsAI helps small nonprofits and small businesses organize grant work in one place.\n\nFIND FUNDERS\nSearch federal grant opportunities and explore foundation information from public records. Review the original source and eligibility requirements before applying.\n\nDRAFT FROM YOUR OWN FACTS\nBuild an organization profile and use AI-assisted tools to draft grant application sections. Review highlighted gaps, check every claim, and edit the wording before using a draft.\n\nORGANIZE THE WORK\nKeep application sections, budgets, supporting documents, tasks, and deadlines together. Track progress and follow-up dates across your organization profiles.\n\nEXPORT AND SUBMIT YOURSELF\nExport your application as a Word document, then submit it through the funder's official process. You stay in control of what goes out.\n\nKEEP YOUR ACCOUNT\nSign in with your existing GrantFlow account. The Android app uses the same hosted GrantFlow service and requires an internet connection.\n\nSome features may require a Pro subscription. Any subscription price, renewal terms, and available features are shown before purchase. AI-assisted drafts require human review. GrantFlow does not award grants or guarantee funding, and is not affiliated with a government agency.\n\nSupport: njwhitt@nocapsai.com",
+  "category": "BUSINESS",
+  "freeToInstall": true,
+  "containsAds": false,
+  "supportEmail": "njwhitt@nocapsai.com",
+  "website": "https://nocapsai-grantflow.vercel.app",
+  "privacyPolicyUrl": "https://nocapsai-grantflow.vercel.app/privacy",
+  "accountDeletionUrl": "https://nocapsai-grantflow.vercel.app/delete-account",
+  "releaseNotes": "First Android internal-test candidate for GrantFlow. Uses the existing web service. Validate sign-in, uploads, Word exports, privacy links, AI reports and Google Play subscriptions before production."
+}

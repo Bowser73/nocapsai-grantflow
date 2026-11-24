@@ -1,0 +1,19 @@
+Prepared product configuration, not created or activated:
+Package: com.nocapsai.grantflow
+Product ID: grantflow_pro
+Base plan suggestion: monthly
+Renewal: auto-renewing monthly
+Existing web price: $29/month. Confirm Play regional pricing/tax treatment in Console; the app displays the actual localized Play price.
+No new price increase, trial, charge or subscription purchase was made.
+
+Server configuration:
+GOOGLE_PLAY_BILLING_ENABLED=false until verification and lifecycle tests pass.
+GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: server-only service-account JSON authorized for this app's purchase verification/acknowledgement. Never put it in NEXT_PUBLIC variables, client code, the Android package or this public repository.
+GOOGLE_PLAY_TOKEN_KEY: 32 random bytes encoded as base64, server only; used to encrypt purchase tokens.
+ANDROID_CERT_SHA256: Google Play APP SIGNING certificate SHA-256 from Play Console. The local upload certificate alone will not validate Play-installed builds when Google uses its own signing key. Multiple colon-delimited certificates may be comma separated.
+
+Lifecycle strategy in this candidate: purchases verified/acknowledged server-side using subscriptionsv2.get; entitlement reads refresh stored subscriptions after five minutes; expired or unverifiable stale purchases fail closed. No RTDN endpoint is configured. Add real-time notifications if needed after the service identity and app are established.
+Cross-provider access: Stripe and complimentary plans remain intact; Play records are separate. Eligibility checks existing Stripe subscriptions before offering a new purchase; web checkout checks Play access. Concurrent purchases still require real integration tests.
+Restore: enumerate Play purchases, verify on server, bind each token to a single GrantFlow user. Pending/on-hold/paused states do not grant access. Canceled paid-through subscriptions remain valid until expiry. Test refund/revocation by live server refresh.
+
+Required license-tester cases: first purchase, cancel purchase, pending approval, renewal, cancellation with time remaining, expiry, grace period, account hold, refund/revocation, reinstall/restore, wrong GrantFlow account, existing Stripe subscription, browser without Digital Goods support, network outage. Do not use real charges for these tests.

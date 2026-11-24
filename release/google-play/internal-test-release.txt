@@ -1,0 +1,10 @@
+NOT CREATED OR ROLLED OUT.
+Existing account: njwhitt@nocapsai.com
+Developer: NoCapsAI, organization account 7238263071764475468.
+Only Family Hub was listed on November 24, 2026. Family Hub was not modified.
+The first GrantFlow form is prepared as NoCapsAI GrantFlow, App, Free, en-US, package com.nocapsai.grantflow. Google confirmed package availability; it is not yet reserved by a created app.
+
+Gate: user must review policy and US export-compliance declarations before the first app entry is created.
+After creation: enroll in Play App Signing, upload the signed candidate, retrieve app-signing certificate, configure website asset links, create subscription/base plan and API verifier access, deploy GrantFlow support changes, test an installed build through the internal track, add only explicitly approved testers, and keep production release unpublished until final approval.
+Use versionCode 1 only if no prior GrantFlow bundle has been uploaded. Reinspect current Console state before upload.
+No tester invitation, billing product, rollout, or production release was performed.
