@@ -1,5 +1,6 @@
 "use client";
 
+import { ReportDraft } from "./report-draft";
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
@@ -8,7 +9,19 @@ import { Button } from "@/components/ui/button";
 import { GRANT_SECTION_LABELS } from "@/types";
 import { runComplianceCheck } from "@/lib/agents/grant-context";
 import type { ComplianceFlag } from "@/types";
-import { Sparkles, Edit2, X, Save, CheckCircle, RotateCcw, AlertCircle, AlertTriangle, Info, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  Sparkles,
+  Edit2,
+  X,
+  Save,
+  CheckCircle,
+  RotateCcw,
+  AlertCircle,
+  AlertTriangle,
+  Info,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface SectionData {
@@ -29,44 +42,59 @@ interface SectionCardProps {
 }
 
 const FLAG_STYLES: Record<ComplianceFlag["severity"], string> = {
-  error:   "bg-red-50 border-red-200 text-red-800",
+  error: "bg-red-50 border-red-200 text-red-800",
   warning: "bg-amber-50 border-amber-200 text-amber-800",
-  info:    "bg-blue-50 border-blue-200 text-blue-700",
+  info: "bg-blue-50 border-blue-200 text-blue-700",
 };
 
 const FLAG_ICONS: Record<ComplianceFlag["severity"], typeof AlertCircle> = {
-  error:   AlertCircle,
+  error: AlertCircle,
   warning: AlertTriangle,
-  info:    Info,
+  info: Info,
 };
 
 function CompliancePanel({ flags }: { flags: ComplianceFlag[] }) {
   const [open, setOpen] = useState(true);
   if (flags.length === 0) return null;
 
-  const errors   = flags.filter((f) => f.severity === "error");
+  const errors = flags.filter((f) => f.severity === "error");
   const warnings = flags.filter((f) => f.severity === "warning");
-  const infos    = flags.filter((f) => f.severity === "info");
+  const infos = flags.filter((f) => f.severity === "info");
 
   const headerColor =
-    errors.length > 0   ? "bg-red-50 border-red-200 text-red-800" :
-    warnings.length > 0 ? "bg-amber-50 border-amber-200 text-amber-800" :
-    "bg-blue-50 border-blue-200 text-blue-700";
+    errors.length > 0
+      ? "bg-red-50 border-red-200 text-red-800"
+      : warnings.length > 0
+        ? "bg-amber-50 border-amber-200 text-amber-800"
+        : "bg-blue-50 border-blue-200 text-blue-700";
 
   const headerIcon =
-    errors.length > 0   ? <AlertCircle size={13} className="text-red-600 shrink-0" /> :
-    warnings.length > 0 ? <AlertTriangle size={13} className="text-amber-600 shrink-0" /> :
-    <Info size={13} className="text-blue-500 shrink-0" />;
+    errors.length > 0 ? (
+      <AlertCircle size={13} className="text-red-600 shrink-0" />
+    ) : warnings.length > 0 ? (
+      <AlertTriangle size={13} className="text-amber-600 shrink-0" />
+    ) : (
+      <Info size={13} className="text-blue-500 shrink-0" />
+    );
 
   return (
-    <div className={cn("mt-3 border rounded-lg overflow-hidden text-xs", headerColor)}>
+    <div
+      className={cn(
+        "mt-3 border rounded-lg overflow-hidden text-xs",
+        headerColor,
+      )}
+    >
       <button
         onClick={() => setOpen(!open)}
-        className={cn("w-full flex items-center justify-between gap-2 px-3 py-2 font-semibold text-left", headerColor)}
+        className={cn(
+          "w-full flex items-center justify-between gap-2 px-3 py-2 font-semibold text-left",
+          headerColor,
+        )}
       >
         <span className="flex items-center gap-1.5">
           {headerIcon}
-          Draft Review — {flags.length} item{flags.length !== 1 ? "s" : ""} to check before approving
+          Draft Review — {flags.length} item{flags.length !== 1 ? "s" : ""} to
+          check before approving
           {errors.length > 0 && (
             <span className="bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
               {errors.length} error{errors.length !== 1 ? "s" : ""}
@@ -81,7 +109,13 @@ function CompliancePanel({ flags }: { flags: ComplianceFlag[] }) {
           {flags.map((flag, i) => {
             const Icon = FLAG_ICONS[flag.severity];
             return (
-              <div key={i} className={cn("flex items-start gap-2 px-3 py-2", FLAG_STYLES[flag.severity])}>
+              <div
+                key={i}
+                className={cn(
+                  "flex items-start gap-2 px-3 py-2",
+                  FLAG_STYLES[flag.severity],
+                )}
+              >
                 <Icon size={12} className="shrink-0 mt-0.5" />
                 <span>{flag.message}</span>
               </div>
@@ -93,7 +127,13 @@ function CompliancePanel({ flags }: { flags: ComplianceFlag[] }) {
   );
 }
 
-export function SectionCard({ section, applicationId, grantTitle = "", funder = "", orgName = "" }: SectionCardProps) {
+export function SectionCard({
+  section,
+  applicationId,
+  grantTitle = "",
+  funder = "",
+  orgName = "",
+}: SectionCardProps) {
   const router = useRouter();
   const [localContent, setLocalContent] = useState(section.content ?? "");
   const [localApproved, setLocalApproved] = useState(section.isApproved);
@@ -109,8 +149,9 @@ export function SectionCard({ section, applicationId, grantTitle = "", funder = 
     : 0;
 
   const label =
-    GRANT_SECTION_LABELS[section.sectionType as keyof typeof GRANT_SECTION_LABELS] ??
-    section.sectionType;
+    GRANT_SECTION_LABELS[
+      section.sectionType as keyof typeof GRANT_SECTION_LABELS
+    ] ?? section.sectionType;
 
   // Run compliance check on current content whenever it changes
   const complianceFlags = useMemo(() => {
@@ -124,7 +165,7 @@ export function SectionCard({ section, applicationId, grantTitle = "", funder = 
     try {
       const res = await fetch(
         `/api/grants/applications/${applicationId}/sections/${section.id}/regenerate`,
-        { method: "POST" }
+        { method: "POST" },
       );
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -153,7 +194,7 @@ export function SectionCard({ section, applicationId, grantTitle = "", funder = 
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ approved: newApproved }),
-        }
+        },
       );
       if (!res.ok) throw new Error("Failed to update approval");
       setLocalApproved(newApproved);
@@ -175,7 +216,7 @@ export function SectionCard({ section, applicationId, grantTitle = "", funder = 
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ content: editContent }),
-        }
+        },
       );
       if (!res.ok) throw new Error("Save failed");
       setLocalContent(editContent);
@@ -198,7 +239,13 @@ export function SectionCard({ section, applicationId, grantTitle = "", funder = 
   const hasErrors = complianceFlags.some((f) => f.severity === "error");
 
   return (
-    <Card className={cn(localApproved && "border-green-200", hasErrors && !localApproved && "border-red-200")}>
+    <Card
+      className={cn(
+        localApproved && "border-green-200",
+        hasErrors && !localApproved && "border-red-200",
+      )}
+    >
+      <ReportDraft sectionId={section.id} />
       {/* Header */}
       <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
         <div className="flex items-center gap-2">
@@ -211,7 +258,8 @@ export function SectionCard({ section, applicationId, grantTitle = "", funder = 
           )}
           {!localApproved && complianceFlags.length > 0 && (
             <Badge variant={hasErrors ? "danger" : "warning"} size="sm">
-              {complianceFlags.length} review item{complianceFlags.length !== 1 ? "s" : ""}
+              {complianceFlags.length} review item
+              {complianceFlags.length !== 1 ? "s" : ""}
             </Badge>
           )}
         </div>
@@ -227,7 +275,10 @@ export function SectionCard({ section, applicationId, grantTitle = "", funder = 
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => { setEditContent(localContent); setIsEditing(true); }}
+                onClick={() => {
+                  setEditContent(localContent);
+                  setIsEditing(true);
+                }}
                 icon={<Edit2 size={13} />}
                 disabled={isRegenerating || isApproving}
               >
@@ -250,18 +301,38 @@ export function SectionCard({ section, applicationId, grantTitle = "", funder = 
                 size="sm"
                 onClick={handleApprove}
                 loading={isApproving}
-                disabled={isRegenerating || !localContent || (hasErrors && !localApproved)}
-                title={hasErrors && !localApproved ? "Fix review errors before approving" : undefined}
+                disabled={
+                  isRegenerating ||
+                  !localContent ||
+                  (hasErrors && !localApproved)
+                }
+                title={
+                  hasErrors && !localApproved
+                    ? "Fix review errors before approving"
+                    : undefined
+                }
               >
                 {localApproved ? "Unapprove" : "Approve"}
               </Button>
             </>
           ) : (
             <>
-              <Button variant="ghost" size="sm" onClick={handleCancelEdit} icon={<X size={13} />} disabled={isSaving}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleCancelEdit}
+                icon={<X size={13} />}
+                disabled={isSaving}
+              >
                 Cancel
               </Button>
-              <Button variant="primary" size="sm" onClick={handleSave} loading={isSaving} icon={<Save size={13} />}>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleSave}
+                loading={isSaving}
+                icon={<Save size={13} />}
+              >
                 Save
               </Button>
             </>
@@ -296,7 +367,7 @@ export function SectionCard({ section, applicationId, grantTitle = "", funder = 
         <div
           className={cn(
             "prose-grant bg-gray-50 rounded-md p-3",
-            localApproved && "bg-green-50/40 border border-green-100"
+            localApproved && "bg-green-50/40 border border-green-100",
           )}
         >
           {localContent || (

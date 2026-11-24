@@ -49,12 +49,30 @@ export const authConfig = {
 
       // Redirect logged-in users away from auth pages
       if (isAuthPage) {
-        if (isLoggedIn) return Response.redirect(new URL("/dashboard", nextUrl));
+        if (isLoggedIn)
+          return Response.redirect(new URL("/dashboard", nextUrl));
         return true;
       }
 
+      if (
+        nextUrl.pathname.startsWith("/api/billing/play") ||
+        nextUrl.pathname === "/api/ai-reports"
+      )
+        return true;
+
       // The public landing page
-      if (nextUrl.pathname === "/") return true;
+      if (
+        [
+          "/",
+          "/android",
+          "/privacy",
+          "/delete-account",
+          "/manifest.webmanifest",
+          "/.well-known/assetlinks.json",
+        ].includes(nextUrl.pathname) ||
+        nextUrl.pathname.startsWith("/app-icons/")
+      )
+        return true;
 
       // Require login for everything else
       if (!isLoggedIn) return false;

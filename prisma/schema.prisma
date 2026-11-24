@@ -186,6 +186,9 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  playSubscriptions PlaySubscription[]
+  aiReports AIContentReport[]
+
   // NextAuth adapter fields
   accounts Account[]
   sessions Session[]
@@ -788,3 +791,27 @@ model Notification {
   @@index([emailPending])
 }
 
+
+model PlaySubscription {
+ id String @id @default(cuid())
+ userId String
+ user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+ tokenHash String @unique
+ encryptedToken String @db.Text
+ state String
+ expiresAt DateTime?
+ verifiedAt DateTime @default(now())
+ @@index([userId])
+}
+
+model AIContentReport {
+ id String @id @default(cuid())
+ userId String
+ user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+ sectionId String
+ reason String
+ note String? @db.Text
+ contentSnapshot String @db.Text
+ createdAt DateTime @default(now())
+ @@index([userId, createdAt])
+}

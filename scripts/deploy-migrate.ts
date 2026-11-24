@@ -27,6 +27,7 @@ import { PrismaClient } from "@prisma/client";
 const MIGRATIONS = [
   "20261111000000_storage_reminders_billing",
   "20261111000001_foundations",
+  "20261124000000_play_subscriptions",
 ];
 
 /** Splits a migration file into statements, ignoring `--` comments.
@@ -55,7 +56,7 @@ async function main() {
   if (!process.env.DATABASE_URL) {
     console.error(
       "[deploy-migrate] DATABASE_URL is not set. Refusing to build: the app would " +
-        "deploy against a database whose schema has not been checked."
+        "deploy against a database whose schema has not been checked.",
     );
     process.exit(1);
   }
@@ -63,12 +64,20 @@ async function main() {
   const prisma = new PrismaClient();
   try {
     for (const name of MIGRATIONS) {
-      const file = path.join(process.cwd(), "prisma", "migrations", name, "migration.sql");
+      const file = path.join(
+        process.cwd(),
+        "prisma",
+        "migrations",
+        name,
+        "migration.sql",
+      );
       const statements = statementsIn(readFileSync(file, "utf8"));
       for (const statement of statements) {
         await prisma.$executeRawUnsafe(statement);
       }
-      console.log(`[deploy-migrate] applied ${name} (${statements.length} statements)`);
+      console.log(
+        `[deploy-migrate] applied ${name} (${statements.length} statements)`,
+      );
       await record(prisma, name);
     }
     console.log("[deploy-migrate] database is up to date");
@@ -90,7 +99,7 @@ async function record(prisma: PrismaClient, name: string) {
        WHERE NOT EXISTS (
          SELECT 1 FROM "_prisma_migrations" WHERE "migration_name" = $1
        )`,
-      name
+      name,
     );
   } catch {
     // No _prisma_migrations table, or a different shape: the schema change
@@ -99,6 +108,9 @@ async function record(prisma: PrismaClient, name: string) {
 }
 
 main().catch((err) => {
-  console.error("[deploy-migrate] failed:", err instanceof Error ? err.message : String(err));
+  console.error(
+    "[deploy-migrate] failed:",
+    err instanceof Error ? err.message : String(err),
+  );
   process.exit(1);
 });

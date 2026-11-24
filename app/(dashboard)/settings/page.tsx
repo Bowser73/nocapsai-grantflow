@@ -24,11 +24,9 @@ const LIMIT_NOTICES: Record<string, string> = {
 
 export const metadata = { title: "Settings" };
 
-export default async function SettingsPage(
-  props: {
-    searchParams?: Promise<{ billing?: string; limit?: string }>;
-  }
-) {
+export default async function SettingsPage(props: {
+  searchParams?: Promise<{ billing?: string; limit?: string }>;
+}) {
   const searchParams = await props.searchParams;
   const session = await auth();
   if (!session?.user?.id) redirect("/auth/login");
@@ -49,26 +47,52 @@ export default async function SettingsPage(
 
   const isAdmin = isAdminEmail(dbUser.email);
   const foundationStates = isAdmin ? await loadedStates() : [];
-  const entitlements = await entitlementsFor(session.user.id, session.user.organizationId);
+  const entitlements = await entitlementsFor(
+    session.user.id,
+    session.user.organizationId,
+  );
   const notice =
     searchParams?.billing === "success"
-      ? { tone: "good" as const, text: "Thanks — your payment went through. Pro switches on within a minute; refresh this page if it still shows Free." }
+      ? {
+          tone: "good" as const,
+          text: "Thanks — your payment went through. Pro switches on within a minute; refresh this page if it still shows Free.",
+        }
       : searchParams?.billing === "cancelled"
-      ? { tone: "warn" as const, text: "Checkout was cancelled. You have not been charged." }
-      : searchParams?.limit && LIMIT_NOTICES[searchParams.limit]
-      ? { tone: "warn" as const, text: LIMIT_NOTICES[searchParams.limit] }
-      : null;
+        ? {
+            tone: "warn" as const,
+            text: "Checkout was cancelled. You have not been charged.",
+          }
+        : searchParams?.limit && LIMIT_NOTICES[searchParams.limit]
+          ? { tone: "warn" as const, text: LIMIT_NOTICES[searchParams.limit] }
+          : null;
 
   return (
     <div>
       <Topbar title="Settings" userName={session.user.name ?? undefined} />
       <div className="p-6 max-w-2xl mx-auto space-y-5">
+        <p className="text-sm">
+          <a className="underline" href="/privacy">
+            Privacy policy
+          </a>{" "}
+          ·{" "}
+          <a className="underline" href="/delete-account">
+            Request account deletion
+          </a>
+        </p>
         {/* User settings */}
         <Card>
           <CardTitle className="mb-4">Account</CardTitle>
           <div className="space-y-4">
-            <Input label="Name" defaultValue={session.user.name ?? ""} disabled />
-            <Input label="Email" defaultValue={session.user.email ?? ""} disabled />
+            <Input
+              label="Name"
+              defaultValue={session.user.name ?? ""}
+              disabled
+            />
+            <Input
+              label="Email"
+              defaultValue={session.user.email ?? ""}
+              disabled
+            />
             <div>
               <p className="text-sm font-medium text-gray-700 mb-1.5">Role</p>
               <Badge>{session.user.role}</Badge>
@@ -84,7 +108,11 @@ export default async function SettingsPage(
             plan={entitlements.plan}
             storedPlan={dbUser.plan}
             subscriptionStatus={dbUser.subscriptionStatus}
-            renewsOn={dbUser.currentPeriodEnd ? formatDate(dbUser.currentPeriodEnd) : null}
+            renewsOn={
+              dbUser.currentPeriodEnd
+                ? formatDate(dbUser.currentPeriodEnd)
+                : null
+            }
             hasBillingAccount={!!dbUser.stripeCustomerId}
             hasSubscription={!!dbUser.stripeSubscriptionId}
             limits={entitlements.limits}
@@ -98,7 +126,10 @@ export default async function SettingsPage(
           <Card>
             <CardTitle className="mb-3">Foundation data</CardTitle>
             <FoundationImportPanel
-              states={Object.entries(US_STATES).map(([code, name]) => ({ code, name }))}
+              states={Object.entries(US_STATES).map(([code, name]) => ({
+                code,
+                name,
+              }))}
               loaded={foundationStates.map((s) => ({
                 state: s.state,
                 count: s.count,
@@ -113,12 +144,15 @@ export default async function SettingsPage(
         <Card>
           <CardTitle className="mb-2">API Configuration</CardTitle>
           <p className="text-xs text-gray-500 mb-4">
-            API keys are set in your server environment (.env file), not stored in the database.
+            API keys are set in your server environment (.env file), not stored
+            in the database.
           </p>
           <div className="space-y-3">
             <SettingRow
               label="OpenAI API Key"
-              value={process.env.OPENAI_API_KEY ? "••••••••••••••" : "Not configured"}
+              value={
+                process.env.OPENAI_API_KEY ? "••••••••••••••" : "Not configured"
+              }
               status={!!process.env.OPENAI_API_KEY}
             />
             <SettingRow

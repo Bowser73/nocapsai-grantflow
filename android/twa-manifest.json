@@ -1,0 +1,37 @@
+{
+  "packageId": "com.nocapsai.grantflow",
+  "host": "nocapsai-grantflow.vercel.app",
+  "name": "NoCapsAI GrantFlow",
+  "launcherName": "GrantFlow",
+  "display": "standalone",
+  "themeColor": "#0C2A2E",
+  "navigationColor": "#0C2A2E",
+  "backgroundColor": "#FAF9F5",
+  "enableNotifications": false,
+  "startUrl": "/android",
+  "iconUrl": "https://nocapsai-grantflow.vercel.app/app-icons/icon-512.png",
+  "maskableIconUrl": "https://nocapsai-grantflow.vercel.app/app-icons/icon-512.png",
+  "splashScreenFadeOutDuration": 200,
+  "signingKey": {
+    "path": ".signing/grantflow-upload.jks",
+    "alias": "grantflow-upload"
+  },
+  "appVersion": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "fallbackType": "customtabs",
+  "features": {
+    "playBilling": {
+      "enabled": true
+    }
+  },
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "minSdkVersion": 28,
+  "orientation": "any",
+  "fingerprints": [],
+  "additionalTrustedOrigins": []
+}

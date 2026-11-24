@@ -1,0 +1,76 @@
+{
+  "status": "DRAFT: evidence-based candidate answers, not submitted or certified",
+  "scope": "GrantFlow Android TWA plus its hosted web service, not Family Hub",
+  "collectsData": true,
+  "encryptedInTransit": true,
+  "accountCreation": "Email and password",
+  "deletionRequestAvailable": "Implemented locally at /delete-account with email verification by the operator; must deploy and validate before answering Yes in Console",
+  "dataTypes": [
+    {
+      "type": "Personal info: name, email, user IDs",
+      "required": "Email, name and user ID are used for account creation and access",
+      "purposes": [
+        "Account management",
+        "App functionality"
+      ],
+      "source": "User model; register route; auth configuration"
+    },
+    {
+      "type": "Personal info: address, phone, other info",
+      "required": "Optional organization profile inputs; may contain personal details",
+      "purposes": [
+        "App functionality"
+      ],
+      "source": "Organization model"
+    },
+    {
+      "type": "Financial info: purchase history and other financial info",
+      "required": "Optional subscriptions and organization budgets / financial documents",
+      "purposes": [
+        "App functionality",
+        "Account management",
+        "Fraud prevention and security"
+      ],
+      "source": "User billing fields, PlaySubscription, GrantBudget, OrganizationDocument"
+    },
+    {
+      "type": "Files and docs; photos; videos",
+      "required": "Optional uploads, including photos/videos if users upload them",
+      "purposes": [
+        "App functionality"
+      ],
+      "source": "DocumentType PHOTO_VIDEO, OrganizationDocument, DocumentBlob"
+    },
+    {
+      "type": "App activity: in-app search history and other user-generated content",
+      "required": "Searches, drafts, notes and AI reports as used",
+      "purposes": [
+        "App functionality"
+      ],
+      "source": "GrantSearchQuery, GrantApplicationSection, AgentRun, AIContentReport"
+    },
+    {
+      "type": "App info and performance: diagnostics; device or other IDs",
+      "required": "Assess actual hosting logs, IP processing and provider identifiers before submission",
+      "purposes": [
+        "App functionality",
+        "Fraud prevention and security"
+      ],
+      "source": "Server logging, hosting and payment providers; exact provider retention not verified"
+    }
+  ],
+  "sharingReview": "Do not certify No sharing until service-provider contracts, OpenAI processing and Google/Stripe handling are reviewed against Google Play definitions. Provider processing is not automatically exempt.",
+  "advertising": "No advertising SDK or advertising ID permission found in this candidate",
+  "preciseLocation": "No location permission requested by the merged candidate manifest",
+  "notConfirmed": [
+    "Database hosting provider and contracts",
+    "Exact log and backup retention",
+    "Deletion processing exceptions and timelines",
+    "Any business sharing outside this repository",
+    "Production processor configuration"
+  ],
+  "sourceUrls": [
+    "https://support.google.com/googleplay/android-developer/answer/10144311",
+    "https://support.google.com/googleplay/android-developer/answer/10787469"
+  ]
+}
